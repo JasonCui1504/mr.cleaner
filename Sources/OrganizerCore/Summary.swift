@@ -9,6 +9,14 @@ public struct SummaryThresholds: Sendable, Equatable {
     public init() {}
 }
 
+/// Count and total size of one extension, for the dashboard.
+public struct ExtensionStat: Sendable, Equatable, Identifiable {
+    public let fileExtension: String
+    public let count: Int
+    public let bytes: Int64
+    public var id: String { fileExtension }
+}
+
 public struct ScanSummary: Sendable, Equatable {
     public var files = 0
     public var folders = 0
@@ -28,6 +36,12 @@ public struct ScanSummary: Sendable, Equatable {
     public var cloudPlaceholders = 0
     public var hiddenEntries = 0
     public var issues = 0
+    /// Dashboard lists (record ids), at most `listLimit` each.
+    public var largestFileIDs: [Int] = []
+    public var recentlyModifiedIDs: [Int] = []
+    public var extensionStats: [ExtensionStat] = []
+
+    public static let listLimit = 10
 
     public init() {}
 
@@ -77,6 +91,24 @@ public struct ScanSummary: Sendable, Equatable {
                 summary.needsReview += 1
             }
         }
+        let fileLike = records.filter { $0.kind.isFileLike }
+        summary.largestFileIDs = fileLike.filter { ($0.size ?? 0) > 0 }
+            .sorted { ($0.size ?? 0) > ($1.size ?? 0) }
+            .prefix(listLimit).map(\.id)
+        summary.recentlyModifiedIDs = fileLike.filter { $0.modified != nil }
+            .sorted { ($0.modified ?? .distantPast) > ($1.modified ?? .distantPast) }
+            .prefix(listLimit).map(\.id)
+        var byExtension: [String: (count: Int, bytes: Int64)] = [:]
+        for record in fileLike {
+            let key = record.fileExtension.isEmpty ? "(none)" : record.fileExtension
+            byExtension[key, default: (0, 0)].count += 1
+            byExtension[key, default: (0, 0)].bytes += record.size ?? 0
+        }
+        summary.extensionStats = byExtension
+            .map { ExtensionStat(fileExtension: $0.key, count: $0.value.count, bytes: $0.value.bytes) }
+            .sorted { $0.count != $1.count ? $0.count > $1.count : $0.fileExtension < $1.fileExtension }
+            .prefix(12).map { $0 }
+
         let duplicates = groups.filter { $0.kind == .potentialDuplicates }
         summary.potentialDuplicateGroups = duplicates.count
         summary.potentialDuplicateFiles = duplicates.reduce(0) { $0 + $1.memberIDs.count }

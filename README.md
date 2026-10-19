@@ -24,6 +24,18 @@ Or open `Package.swift` in Xcode and run the `ReadOnlyOrganizer` scheme.
 
 Optional: `scripts/bundle_app.sh` wraps the release build into `.build/ReadOnlyOrganizer.app`, which you can double-click. Add `--sandbox` to ad-hoc sign it with an App Sandbox profile that makes macOS itself enforce read-only folder access and block networking (see [docs/SAFETY_REVIEW.md](docs/SAFETY_REVIEW.md#optional-os-enforced-sandbox)). Nothing is installed, signed with a real identity, or notarized.
 
+## Install it in your Dock
+
+On your Mac, from the repository folder:
+
+```sh
+scripts/install_app.sh
+```
+
+This builds a release copy, installs it as `~/Applications/Read-Only File Organizer.app` (with its icon and a local ad-hoc signature), and adds a tile to your Dock. It needs no `sudo`, doesn't touch `/Applications`, and uses no network. Options: `--no-dock` (install only), `--sandbox` (install the App Sandbox build, so macOS itself enforces read-only access and no network), `--uninstall`. To update after pulling new code, run the script again; it replaces only its own previous copy.
+
+The app opens on the **Dashboard** tab: file/folder/size totals, review candidates, potential duplicates, large/old/recent counts, category breakdown, top file types, the largest files, and the most recently modified files. Everything is computed locally, in memory, from the folder you scan.
+
 ## Run the tests
 
 ```sh
@@ -37,7 +49,7 @@ Tests create synthetic files only under `Tests/Fixtures/Generated/` (git-ignored
 1. **Choose Folder…** opens the standard macOS folder picker. The picker's "New Folder" button is disabled.
 2. **Scan Folder** lists that folder and its subfolders. A scan never starts on its own. **Stop Scan** cancels and keeps partial results.
 3. Tabs:
-   - **Summary**: totals, size, counts per category, review candidates, potential duplicates, large/old/recent files (thresholds adjustable for the session), and skipped/inaccessible paths.
+   - **Dashboard**: totals, size, counts per category, review candidates, potential duplicates, large/old/recent files (thresholds adjustable for the session), category breakdown, top file types, largest and most recently modified files, and skipped/inaccessible paths.
    - **Files**: a sortable, virtualized table (Name, Category, Type, Size, Created, Modified, Relative Path, Confidence) with search and filters (category, type, kind, date range, size range, hidden, needs-review). Select a row to see its metadata, the category rationale, matched rule IDs, and session-only edits (change category, mark "Review later").
    - **Groups**: potential duplicates (name + size), version clusters, same-name-different-format, software projects, shared prefixes, keyword-related files, same-day clusters, and folder themes, each with its reason.
    - **Suggested Organization (Preview)**: virtual destination paths next to each file's current path. These folders do not exist and the app has no way to create them.
@@ -67,7 +79,8 @@ Sources/OrganizerCore/      scanning, rules, grouping, filtering (Foundation onl
   SafetyPolicy.swift        read-only/offline statement shown in the UI
 Sources/ReadOnlyOrganizer/  AppKit lifecycle + SwiftUI views
 Tests/OrganizerCoreTests/   unit, integration, performance and safety tests
-scripts/                    manual fixture + snapshot tools, optional .app bundler
+scripts/                    Dock installer, .app bundler, icon generator, manual fixture + snapshot tools
+Support/                    Info.plist, app icon, optional sandbox entitlements
 docs/                       safety review, rules, manual checklist, limitations
 ```
 

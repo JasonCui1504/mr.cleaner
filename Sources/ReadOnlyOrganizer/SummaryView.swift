@@ -17,8 +17,19 @@ struct SummaryView: View {
                             .foregroundStyle(.orange)
                     }
                     tiles
+                    HStack(alignment: .top, spacing: 12) {
+                        categoryBreakdown
+                        fileTypes
+                    }
+                    HStack(alignment: .top, spacing: 12) {
+                        recordList("Largest files", ids: summary.largestFileIDs) { record in
+                            Formatting.size(record.size ?? 0)
+                        }
+                        recordList("Recently modified", ids: summary.recentlyModifiedIDs) { record in
+                            Formatting.date(record.modified)
+                        }
+                    }
                     thresholdsEditor
-                    categoryBreakdown
                     issuesList
                 }
             }
@@ -95,6 +106,50 @@ struct SummaryView: View {
                 Text("Categories are suggestions from filename and type rules. File contents were not inspected.")
                     .font(.caption).foregroundStyle(.secondary)
             }
+            .padding(6)
+        }
+    }
+
+    private var fileTypes: some View {
+        GroupBox("Top file types") {
+            VStack(alignment: .leading, spacing: 4) {
+                ForEach(summary.extensionStats) { stat in
+                    HStack {
+                        Text(stat.fileExtension == "(none)" ? "(no extension)" : "." + stat.fileExtension)
+                            .font(.system(.callout, design: .monospaced))
+                        Spacer()
+                        Text(stat.count.formatted()).monospacedDigit()
+                        Text(Formatting.size(stat.bytes)).monospacedDigit().foregroundStyle(.secondary)
+                            .frame(width: 80, alignment: .trailing)
+                    }
+                }
+            }
+            .padding(6)
+        }
+        .frame(width: 300)
+    }
+
+    /// A short list of records with one value column.
+    private func recordList(_ title: String, ids: [Int], value: @escaping (FileRecord) -> String) -> some View {
+        GroupBox(title) {
+            VStack(alignment: .leading, spacing: 4) {
+                ForEach(ids, id: \.self) { id in
+                    if let record = controller.record(id) {
+                        HStack {
+                            Text(record.relativePath)
+                                .font(.system(.callout, design: .monospaced))
+                                .lineLimit(1).truncationMode(.middle)
+                                .help(record.relativePath)
+                            Spacer()
+                            Text(value(record)).monospacedDigit().foregroundStyle(.secondary)
+                        }
+                    }
+                }
+                if ids.isEmpty {
+                    Text("None").foregroundStyle(.secondary)
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
             .padding(6)
         }
     }

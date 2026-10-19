@@ -38,11 +38,11 @@ swift run ReadOnlyOrganizer
 - [ ] **Choose Folder…** → select `Tests/Fixtures/Manual`. The picker has no "New Folder" button. The exact path is shown.
 - [ ] The "Read-only · Offline · No AI" badge and the "never changes…" banner are visible.
 - [ ] **Scan Folder** → the scan completes. Try **Stop Scan** on a larger synthetic folder (e.g. run the tests' performance fixture generator, or duplicate the fixture several times *inside* `Tests/Fixtures/`) and confirm partial results are shown with a warning.
-- [ ] Summary: counts and total size look right. "Creation date unavailable" is 0 on APFS. Potential duplicates show `photo.jpg` / `photo (1).jpg`.
+- [ ] Dashboard: counts and total size look right; top file types, largest files and recently modified lists are populated. "Creation date unavailable" is 0 on APFS. Potential duplicates show `photo.jpg` / `photo (1).jpg`.
 - [ ] Files: sort by Size and Modified (numeric/chronological order). Search "invoice". Filter by category, type, hidden, and needs-review. Select rows and read the rationale and rule IDs.
 - [ ] `link-outside` is shown as a symbolic link "pointing outside", and nothing from `Sources/` appears in the results. `link-loop` causes no repetition.
 - [ ] `Tool.app` is one item (Package) with no children listed.
-- [ ] Change a file's category and mark "Review later". The Summary and Suggested Organization update. Quit and relaunch: the edits are gone.
+- [ ] Change a file's category and mark "Review later". The Dashboard and Suggested Organization update. Quit and relaunch: the edits are gone.
 - [ ] Groups tab: version cluster (thesis…), same-stem (report.docx/pdf), project (`project`), same-day cluster (IMG_000x), each with an explanation.
 - [ ] Suggested Organization: banner says PREVIEW ONLY, paths are italic "Suggested" next to "Currently". There are no Apply/Move/Rename/Delete/Organize buttons.
 

@@ -21,9 +21,10 @@ BIN="$(swift build -c release --show-bin-path)/ReadOnlyOrganizer"
 APP="$REPO/.build/ReadOnlyOrganizer.app"
 
 rm -rf "$APP"
-mkdir -p "$APP/Contents/MacOS"
+mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 cp "$BIN" "$APP/Contents/MacOS/ReadOnlyOrganizer"
 cp "$REPO/Support/Info.plist" "$APP/Contents/Info.plist"
+cp "$REPO/Support/AppIcon.icns" "$APP/Contents/Resources/AppIcon.icns"
 
 if [ "${1:-}" = "--sandbox" ]; then
   codesign --force --sign - --entitlements "$REPO/Support/ReadOnlyOrganizer.entitlements" "$APP"

@@ -46,6 +46,25 @@ final class SummaryFilterTests: XCTestCase {
         XCTAssertEqual(adjusted.recentFiles, 2)
     }
 
+    func testDashboardLists() {
+        let records = [
+            makeRecord(0, "Docs", kind: .directory),
+            makeRecord(1, "a.pdf", size: 50, modified: now.addingTimeInterval(-10)),
+            makeRecord(2, "b.pdf", size: 5_000, modified: now.addingTimeInterval(-1_000)),
+            makeRecord(3, "c.mov", size: 900, modified: now),
+            makeRecord(4, "empty.txt", size: 0, modified: nil),
+            makeRecord(5, "Makefile", size: 1, modified: now.addingTimeInterval(-5)),
+        ]
+        let summary = ScanSummary.compute(
+            records: records, classifications: records.map { RuleClassifier().classify($0) },
+            reviewLater: [], groups: [], issueCount: 0, thresholds: SummaryThresholds(), now: now)
+        XCTAssertEqual(summary.largestFileIDs, [2, 3, 1, 5])     // zero-byte files and folders excluded
+        XCTAssertEqual(summary.recentlyModifiedIDs, [3, 5, 1, 2]) // missing dates excluded
+        XCTAssertEqual(summary.extensionStats.first, ExtensionStat(fileExtension: "pdf", count: 2, bytes: 5_050))
+        XCTAssertTrue(summary.extensionStats.contains { $0.fileExtension == "(none)" && $0.count == 1 })
+        XCTAssertEqual(summary.extensionStats.count, 4)
+    }
+
     func testSizesSortNumericallyNotAsText() {
         let data = rows([
             makeRecord(0, "a.txt", size: 9),

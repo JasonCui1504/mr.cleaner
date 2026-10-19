@@ -16,7 +16,7 @@ struct ContentView: View {
             Divider()
             TabView(selection: $tab) {
                 SummaryView(controller: controller)
-                    .tabItem { Text("Summary") }
+                    .tabItem { Text("Dashboard") }
                     .tag(Tab.summary)
                 FileTableView(controller: controller, selection: $selectedRecordID)
                     .tabItem { Text("Files") }

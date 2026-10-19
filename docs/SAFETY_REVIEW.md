@@ -80,6 +80,16 @@ The app's code writes nothing. The operating system may still record some state 
 
 With this profile, macOS denies any write to the selected folder and any outbound network connection, independent of the app's code. It is optional because it involves ad-hoc code signing and the container folder described above.
 
+## Installing (`scripts/install_app.sh`)
+
+The installer runs only when you invoke it. It is not part of the app. It writes exactly:
+
+- `.build/ReadOnlyOrganizer.app` (inside the repository)
+- `~/Applications/Read-Only File Organizer.app`, replacing a previous copy only if that copy has this app's bundle identifier
+- one Dock tile, added to `com.apple.dock persistent-apps` with `defaults write`, after which the Dock is restarted (`killall Dock`). Skip this with `--no-dock`.
+
+The installed bundle gets a local ad-hoc code signature (`codesign --sign -`). This is not a Developer ID signature, and nothing is notarized or uploaded. The app itself still writes nothing at runtime.
+
 ## Build-time writes
 
 `swift build` / `swift test` write only to `.build/` inside the repository. Tests write synthetic fixtures only to `Tests/Fixtures/Generated/` (the helper refuses any other path). The manual-verification scripts write only to `Tests/Fixtures/Manual/` and `Tests/Fixtures/Snapshots/`.
