@@ -46,7 +46,16 @@ swift run ReadOnlyOrganizer
 - [ ] Groups tab: version cluster (thesis…), same-stem (report.docx/pdf), project (`project`), same-day cluster (IMG_000x), each with an explanation.
 - [ ] Suggested Organization: banner says PREVIEW ONLY, paths are italic "Suggested" next to "Currently". There are no Apply/Move/Rename/Delete/Organize buttons.
 
-## 4. Verify that nothing changed
+## 3b. Organize mode (optional; do this on a fresh copy of the fixture)
+
+- [ ] The switch is off at launch, and turning it on asks for confirmation.
+- [ ] Files tab: select two rows → Move 2 items to… → `Trash` folder. `Tests/Fixtures/Manual/Trash/` now holds both, with unchanged names, sizes and SHA-256.
+- [ ] Moving a file to a folder that already has the same name is skipped and listed under Changes.
+- [ ] Changes → Undo All Moves puts everything back.
+- [ ] Suggested Organization → Create Folders and Move Files… creates only the checked folders, leaves `project/` untouched, and reports skips.
+- [ ] Re-run `scripts/snapshot_fixture.sh compare` after Undo All. Content hashes, names and sizes match the snapshot (folder modification times and `Trash/` itself may differ).
+
+## 4. Verify that nothing changed (read-only mode)
 
 ```sh
 scripts/snapshot_fixture.sh compare

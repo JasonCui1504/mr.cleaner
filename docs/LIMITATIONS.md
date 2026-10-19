@@ -2,7 +2,12 @@
 
 ## By design (version 1)
 
-- **No actions.** There is no organize, move, rename, delete, export, or "apply" feature, and no file-mutation code path exists. Suggestions are a preview only.
+- **Only two actions, only in Organize mode.** Create a folder directly inside the selected folder, and move an item (name unchanged) into it. There is no delete, rename, copy, or export. Emptying the `Trash` folder is up to you.
+- **Name conflicts are skipped.** If the destination already has an item with that name, the move is skipped and reported in the Changes tab; the app never renames to make room.
+- **Undo is per session.** The move log is in memory. After quitting, move things back in Finder.
+- **Empty source folders stay.** After moving files out, their old folders remain (possibly empty); remove them yourself if you like.
+- **Software projects are never split.** "Create Folders and Move Files…" skips files inside detected projects; move a whole project folder from the Files tab if you want.
+- **Same disk only.** Items on another volume mounted inside the selected folder are not moved.
 - **No saving.** Results, edits, and thresholds disappear on quit. There is no report export. (A future export would need its own explicit, separately approved design.)
 - **Filenames only.** Categories come from names, extensions, and kinds. A file named `IMG_2041.pdf` that is really a tax form will not be recognized. Confidence describes rule strength, not truth.
 - **No content inspection.** No hashing, so duplicates are *potential* (same name + size). Two different files can share both, and true duplicates with different names are not found.

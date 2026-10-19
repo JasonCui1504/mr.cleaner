@@ -8,9 +8,12 @@ import Foundation
 /// `Sources/` for mutating or networking APIs).
 ///
 /// Rules enforced by construction:
-/// - The only filesystem calls in `Sources/` are directory listing,
-///   `lstat`, URL resource-value lookups, and reading a symbolic link's
-///   target text. All live in `FolderScanner.swift`.
+/// - Reading: directory listing, `lstat`, URL resource-value lookups, and
+///   reading a symbolic link's target text, all in `FolderScanner.swift`.
+/// - Changing (Organize mode only, off by default): creating a folder directly
+///   inside the selected folder and moving an item into it with its name
+///   unchanged, both in `FileOrganizer.swift`. No delete, rename, copy,
+///   overwrite or content edit exists anywhere.
 /// - No file contents are ever opened or read; nothing is hashed.
 /// - Symbolic links are never followed; packages and cloud placeholder
 ///   folders are not descended into.
@@ -38,8 +41,26 @@ public enum SafetyPolicy {
     """
 
     public static let suggestionNote = """
-    Suggestions only. None of these folders exist and nothing has been moved. \
-    This version has no way to apply them.
+    Suggestions only. Nothing has been moved. To create these folders and move \
+    files into them, turn on Organize mode in the toolbar.
+    """
+
+    public static let organizeHeadline = "Organize mode · create folders & move only"
+
+    public static let organizeBannerText = """
+    Organize mode is ON. The app may create new folders inside the selected folder and \
+    move items into them, keeping their names. It never deletes, renames, copies, \
+    overwrites or edits anything. Items you move to “Trash” stay there until you delete \
+    that folder yourself in Finder. Every move can be undone from the Changes tab.
+    """
+
+    public static let organizeModeExplanation = """
+    While Organize mode is on, the app can do exactly two things, and only inside the folder you selected:
+
+    • create new folders directly inside it, and
+    • move items into those folders, keeping their names.
+
+    It cannot delete, rename, copy, overwrite or edit files. If a name is already taken in the destination, the item is skipped. “Trash” is an ordinary folder you empty yourself. Moves can be undone during this session. Organize mode turns off when you quit.
     """
 
     public static let sessionOnlyNote = "Session only: not saved, never written to the file."

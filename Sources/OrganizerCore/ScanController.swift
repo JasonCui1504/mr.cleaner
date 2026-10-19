@@ -7,6 +7,10 @@ import Combine
 ///
 /// Everything here is in memory. Session edits (category overrides, "review
 /// later") are discarded when the app quits and are never written anywhere.
+///
+/// Organize mode (off by default, every launch) is the only way to change the
+/// filesystem, and it is limited to what `FileOrganizer` allows: creating
+/// folders directly inside the selected folder and moving items into them.
 @MainActor
 public final class ScanController: ObservableObject {
 
@@ -17,9 +21,10 @@ public final class ScanController: ObservableObject {
         case analyzing
         case finished
         case stopped
+        case organizing
         case failed(String)
 
-        public var isBusy: Bool { self == .scanning || self == .analyzing }
+        public var isBusy: Bool { self == .scanning || self == .analyzing || self == .organizing }
     }
 
     @Published public private(set) var rootURL: URL?
@@ -37,6 +42,12 @@ public final class ScanController: ObservableObject {
     @Published public private(set) var overrides: [Int: FileCategory] = [:]
     @Published public private(set) var reviewLater: Set<Int> = []
     @Published public private(set) var lastScanDuration: TimeInterval?
+
+    /// Off at every launch. While off, no folder is created and nothing is moved.
+    @Published public var organizeModeEnabled = false
+    /// Moves made this session (newest last), for Undo. In memory only.
+    @Published public private(set) var moveLog: [FileOrganizer.Move] = []
+    @Published public private(set) var lastOrganizeReport: OrganizeReport?
 
     @Published public var options = ScanOptions()
     @Published public var thresholds = SummaryThresholds() {
@@ -197,6 +208,91 @@ public final class ScanController: ObservableObject {
         Array(Set(records.lazy.filter { $0.kind != .directory }.map(\.fileExtension).filter { !$0.isEmpty })).sorted()
     }
 
+    // MARK: Organize mode (create folders + move only)
+
+    /// Folders offered as move destinations: the Trash folder plus every
+    /// suggested category folder.
+    public var destinationFolderNames: [String] {
+        [FileOrganizer.trashFolderName] + FileCategory.allCases.map(\.suggestedFolderName)
+    }
+
+    /// Moves the given records (keeping their names) into `root/folderName`.
+    public func move(recordIDs: [Int], toFolderNamed folderName: String) {
+        let sources = recordIDs.compactMap { self.record($0) }.map { URL(fileURLWithPath: $0.path) }
+        runOrganize(description: "Move to “\(folderName)”") { organizer in
+            sources.map { source in
+                OrganizeReport.Outcome(path: source.path, result: Result { try organizer.move(source, intoFolderNamed: folderName) })
+            }
+        }
+    }
+
+    /// Plan items that "apply plan" would move for the given folders: not in
+    /// a software project, a file or package, and not already in place.
+    public func movablePlanItems(inFolders folders: Set<String>) -> [PlannedItem] {
+        plan.filter { folders.contains($0.name) }.flatMap(\.items).filter { item in
+            guard !item.isInProject, let record = self.record(item.id), record.kind.isFileLike else { return false }
+            return record.parentRelativePath != item.folderName
+        }
+    }
+
+    /// Creates the chosen suggested folders and moves their files into them.
+    public func applyPlan(folders: Set<String>) {
+        let moves = movablePlanItems(inFolders: folders).compactMap { item -> (URL, String)? in
+            guard let record = self.record(item.id) else { return nil }
+            return (URL(fileURLWithPath: record.path), item.folderName)
+        }
+        runOrganize(description: "Move files into suggested folders") { organizer in
+            moves.map { source, folder in
+                OrganizeReport.Outcome(path: source.path, result: Result { try organizer.move(source, intoFolderNamed: folder) })
+            }
+        }
+    }
+
+    /// Moves an item back to its original location (nothing is overwritten).
+    public func undo(_ moves: [FileOrganizer.Move]) {
+        let ordered = Array(moves.reversed())
+        runOrganize(description: "Undo", undoing: Set(ordered.map(\.id))) { _ in
+            ordered.map { move in
+                OrganizeReport.Outcome(path: move.toPath, result: Result {
+                    try FileOrganizer(root: URL(fileURLWithPath: move.rootPath)).undo(move)
+                })
+            }
+        }
+    }
+
+    private func runOrganize(
+        description: String,
+        undoing: Set<UUID> = [],
+        _ work: @escaping @Sendable (FileOrganizer) -> [OrganizeReport.Outcome]
+    ) {
+        guard organizeModeEnabled, let root = rootURL, !phase.isBusy else { return }
+        phase = .organizing
+        Task.detached(priority: .userInitiated) {
+            let outcomes: [OrganizeReport.Outcome]
+            do {
+                let organizer = try FileOrganizer(root: root)
+                outcomes = work(organizer)
+            } catch {
+                outcomes = [OrganizeReport.Outcome(path: root.path, result: .failure(error))]
+            }
+            await MainActor.run { self.finishOrganize(description: description, outcomes: outcomes, undoing: undoing) }
+        }
+    }
+
+    private func finishOrganize(description: String, outcomes: [OrganizeReport.Outcome], undoing: Set<UUID>) {
+        let completed = outcomes.compactMap(\.move)
+        if undoing.isEmpty {
+            moveLog += completed
+        } else {
+            // Drop log entries whose undo succeeded (matched by original destination).
+            let undoneSources = Set(completed.map(\.fromPath))
+            moveLog.removeAll { undoing.contains($0.id) && undoneSources.contains($0.toPath) }
+        }
+        lastOrganizeReport = OrganizeReport(title: description, outcomes: outcomes)
+        phase = .finished
+        startScan()   // refresh results so they match the new layout
+    }
+
     // MARK: Derived data
 
     private var effectiveClassifications: [Classification?] {
@@ -234,4 +330,33 @@ public final class ScanController: ObservableObject {
             records: records, classifications: effectiveClassifications,
             projects: projects, projectByRecord: projectByRecord)
     }
+}
+
+/// Result of one organize action, shown in the Changes tab.
+public struct OrganizeReport: Sendable {
+    public struct Outcome: Sendable, Identifiable {
+        public let id = UUID()
+        public let path: String
+        public let move: FileOrganizer.Move?
+        public let errorMessage: String?
+
+        public init(path: String, result: Result<FileOrganizer.Move, Error>) {
+            self.path = path
+            switch result {
+            case .success(let move):
+                self.move = move
+                self.errorMessage = nil
+            case .failure(let error):
+                self.move = nil
+                self.errorMessage = error.localizedDescription
+            }
+        }
+    }
+
+    public let title: String
+    public let outcomes: [Outcome]
+    public let date = Date()
+
+    public var movedCount: Int { outcomes.filter { $0.errorMessage == nil }.count }
+    public var skipped: [Outcome] { outcomes.filter { $0.errorMessage != nil } }
 }

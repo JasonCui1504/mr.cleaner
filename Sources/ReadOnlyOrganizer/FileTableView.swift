@@ -3,7 +3,7 @@ import OrganizerCore
 
 struct FileTableView: View {
     @ObservedObject var controller: ScanController
-    @Binding var selection: Int?
+    @Binding var selection: Set<Int>
 
     @State private var criteria = FilterCriteria()
     @State private var sortOrder: [KeyPathComparator<FileRow>] = [KeyPathComparator(\FileRow.relativePath)]
@@ -12,6 +12,16 @@ struct FileTableView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             FilterBar(criteria: $criteria, extensions: controller.availableExtensions)
+            if controller.organizeModeEnabled {
+                HStack(spacing: 10) {
+                    MoveMenu(controller: controller, ids: selectedIDs)
+                    Text(selection.isEmpty
+                         ? "Select rows (⌘-click or ⇧-click for several) to move them."
+                         : "\(selection.count) selected. Items keep their names; nothing is overwritten.")
+                        .font(.caption).foregroundStyle(.secondary)
+                    Spacer()
+                }
+            }
             HSplitView {
                 // Table is backed by NSTableView: rows are rendered lazily, so
                 // very large result sets stay responsive.
@@ -60,8 +70,12 @@ struct FileTableView: View {
                 .frame(minWidth: 600)
 
                 Group {
-                    if let id = selection, controller.record(id) != nil {
+                    if selection.count == 1, let id = selection.first, controller.record(id) != nil {
                         FileDetailView(controller: controller, recordID: id)
+                    } else if selection.count > 1 {
+                        Text("\(selection.count) items selected.")
+                            .foregroundStyle(.secondary)
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
                     } else {
                         Text("Select a row to see details and the reason for its category.")
                             .foregroundStyle(.secondary)
@@ -82,6 +96,15 @@ struct FileTableView: View {
         .onChange(of: criteria) { _ in refresh() }
         .onChange(of: sortOrder) { _ in refresh() }
         .onChange(of: controller.rowsVersion) { _ in refresh() }
+        .onChange(of: controller.phase) { phase in
+            // A rescan renumbers records, so an old selection would point at other files.
+            if phase == .scanning { selection = [] }
+        }
+    }
+
+    /// Selected records, in table order.
+    private var selectedIDs: [Int] {
+        displayed.map(\.id).filter { selection.contains($0) }
     }
 
     private func refresh() {

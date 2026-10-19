@@ -8,6 +8,11 @@ public struct PlannedItem: Identifiable, Sendable, Hashable {
     public let reason: String
     /// Another planned item would have the same suggested path.
     public var hasNameCollision: Bool
+    /// Top-level suggested folder this item belongs to.
+    public var folderName: String = ""
+    /// Inside a detected software project. Organize mode never moves these
+    /// individually, so projects stay intact.
+    public var isInProject = false
 }
 
 public struct PlannedFolder: Identifiable, Sendable, Hashable {
@@ -41,7 +46,7 @@ public enum OrganizationPlan {
                 itemsByCategory[.software, default: []].append(PlannedItem(
                     id: record.id, suggestedPath: path, currentRelativePath: record.relativePath,
                     reason: "Part of the software project “\(projectName)”; projects are kept intact. (File category: \(classification.category.displayName).)",
-                    hasNameCollision: false))
+                    hasNameCollision: false, folderName: FileCategory.software.suggestedFolderName, isInProject: true))
             } else {
                 let category = classification.category
                 let path = "\(category.suggestedFolderName)/\(record.name)"
@@ -50,7 +55,7 @@ public enum OrganizationPlan {
                     : "\(classification.confidence.displayName) confidence: \(classification.explanation)"
                 itemsByCategory[category, default: []].append(PlannedItem(
                     id: record.id, suggestedPath: path, currentRelativePath: record.relativePath,
-                    reason: reason, hasNameCollision: false))
+                    reason: reason, hasNameCollision: false, folderName: category.suggestedFolderName))
             }
         }
 

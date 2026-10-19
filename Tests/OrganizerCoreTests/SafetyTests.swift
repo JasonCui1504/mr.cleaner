@@ -2,9 +2,11 @@ import Foundation
 import XCTest
 
 /// Static checks over every Swift file in `Sources/`. These prove, by source
-/// inspection, that the app contains no file-mutation, process-execution,
-/// networking, persistence, or AI/ML code paths. Comment lines are ignored so
-/// that documentation can name the APIs it forbids.
+/// inspection, that the app contains no delete/rename/copy/edit code paths, no
+/// process execution, networking, persistence, or AI/ML. The only changes it
+/// can make (Organize mode) are creating folders and moving items, and only in
+/// `FileOrganizer.swift`. Comment lines are ignored so that documentation can
+/// name the APIs it forbids.
 final class SafetyTests: XCTestCase {
 
     private struct SourceLine {
@@ -63,8 +65,8 @@ final class SafetyTests: XCTestCase {
     // `.system(...)` font or `.read(...)` on other types do not match.
     func testNoFileMutationAPIs() throws {
         try assertNoMatches([
-            #"createFile"#, #"moveItem"#, #"copyItem"#, #"removeItem"#, #"replaceItem"#, #"trashItem"#,
-            #"createDirectory"#, #"createSymbolicLink"#, #"linkItem"#, #"setAttributes"#,
+            #"createFile"#, #"copyItem"#, #"removeItem"#, #"replaceItem"#, #"trashItem"#,
+            #"createSymbolicLink"#, #"linkItem"#, #"setAttributes"#,
             #"setResourceValue"#, #"setResourceValues"#, #"setTagNames"#, #"setxattr"#, #"removexattr"#,
             #"\.write\("#, #"\.write\(to"#, #"write\(toFile"#, #"writeToFile"#, #"writeToURL"#,
             #"FileHandle\(forWriting"#, #"FileHandle\(forUpdating"#, #"forWritingTo"#, #"forWritingAtPath"#,
@@ -120,25 +122,50 @@ final class SafetyTests: XCTestCase {
         ], "AI/ML dependency in app sources")
     }
 
+    func testFolderCreationAndMovingOnlyInFileOrganizer() throws {
+        let regex = try NSRegularExpression(pattern: #"createDirectory|moveItem"#)
+        var found = Set<String>()
+        for sourceLine in try codeLines() {
+            let text = sourceLine.text
+            if regex.firstMatch(in: text, range: NSRange(text.startIndex..., in: text)) != nil {
+                XCTAssertEqual(sourceLine.file, "FileOrganizer.swift",
+                               "Folder creation / moving outside FileOrganizer.swift at \(sourceLine.file):\(sourceLine.number)")
+                found.insert(sourceLine.file)
+            }
+        }
+        XCTAssertEqual(found, ["FileOrganizer.swift"])
+    }
+
+    func testFileOrganizerNeverOverwritesOrCreatesIntermediates() throws {
+        let url = Self.sourcesDirectory.appendingPathComponent("OrganizerCore/FileOrganizer.swift")
+        let text = try String(contentsOf: url, encoding: .utf8)
+        XCTAssertTrue(text.contains("withIntermediateDirectories: false"))
+        XCTAssertFalse(text.contains("withIntermediateDirectories: true"))
+        XCTAssertFalse(text.contains("replaceItem"))
+    }
+
     func testFileManagerUsageIsAllowListed() throws {
         let allowed: Set<String> = ["contentsOfDirectory", "destinationOfSymbolicLink", "default"]
+        let organizerOnly: Set<String> = ["createDirectory", "moveItem"]
         let regex = try NSRegularExpression(pattern: #"(?:FileManager\.default|fileManager)\.(\w+)"#)
         for sourceLine in try codeLines() {
             let text = sourceLine.text
             for match in regex.matches(in: text, range: NSRange(text.startIndex..., in: text)) {
                 guard let range = Range(match.range(at: 1), in: text) else { continue }
                 let method = String(text[range])
-                XCTAssertTrue(allowed.contains(method), "Unexpected FileManager call `\(method)` in \(sourceLine.file):\(sourceLine.number)")
+                let ok = allowed.contains(method) || (organizerOnly.contains(method) && sourceLine.file == "FileOrganizer.swift")
+                XCTAssertTrue(ok, "Unexpected FileManager call `\(method)` in \(sourceLine.file):\(sourceLine.number)")
             }
         }
     }
 
-    func testFilesystemAccessIsConfinedToScanner() throws {
+    func testFilesystemAccessIsConfinedToScannerAndOrganizer() throws {
         let filesystemPatterns = try NSRegularExpression(pattern: #"FileManager|lstat\(|resourceValues\(|\bstat\("#)
         for sourceLine in try codeLines() {
             let text = sourceLine.text
             if filesystemPatterns.firstMatch(in: text, range: NSRange(text.startIndex..., in: text)) != nil {
-                XCTAssertEqual(sourceLine.file, "FolderScanner.swift", "Filesystem access outside FolderScanner.swift at \(sourceLine.file):\(sourceLine.number)")
+                XCTAssertTrue(["FolderScanner.swift", "FileOrganizer.swift"].contains(sourceLine.file),
+                              "Filesystem access outside FolderScanner.swift / FileOrganizer.swift at \(sourceLine.file):\(sourceLine.number)")
             }
         }
     }
@@ -160,10 +187,10 @@ final class SafetyTests: XCTestCase {
     }
 
     func testNoForbiddenActionLabelsInUI() throws {
-        // The UI must not offer actions that imply changing files.
+        // Moving is allowed (Organize mode); deleting, renaming or cleaning is not.
         try assertNoMatches([
-            #"Button\("(Apply|Move|Rename|Delete|Organize now|Trash|Clean)"#,
-            #"Label\("(Apply|Move|Rename|Delete|Organize now|Trash|Clean)"#,
+            #"Button\("(Rename|Delete|Erase|Empty Trash|Clean|Shred)"#,
+            #"Label\("(Rename|Delete|Erase|Empty Trash|Clean|Shred)"#,
             #"(?i)safe to delete"#,
         ], "Mutation-implying UI label")
     }

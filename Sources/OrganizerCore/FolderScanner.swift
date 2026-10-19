@@ -322,6 +322,8 @@ struct LStat {
     let modifiedTime: Date?
     let statusChangeTime: Date?
     let accessTime: Date?
+    /// Volume the entry lives on (st_dev).
+    let device: Int64
 
     init?(url: URL) {
         var info = stat()
@@ -343,6 +345,7 @@ struct LStat {
         modifiedTime = LStat.date(info.st_mtimespec)
         statusChangeTime = LStat.date(info.st_ctimespec)
         accessTime = LStat.date(info.st_atimespec)
+        device = Int64(info.st_dev)
     }
 
     static func date(_ spec: timespec) -> Date {

@@ -44,6 +44,14 @@ struct GroupingView: View {
                                             Text(Formatting.size(size)).font(.caption).foregroundStyle(.secondary)
                                         }
                                         Spacer()
+                                        if controller.organizeModeEnabled {
+                                            Button("Move to “\(FileOrganizer.trashFolderName)” folder") {
+                                                controller.move(recordIDs: [id], toFolderNamed: FileOrganizer.trashFolderName)
+                                            }
+                                            .buttonStyle(.link)
+                                            .font(.caption)
+                                            .disabled(controller.phase.isBusy)
+                                        }
                                         Button("Show in Files") { showInTable(id) }
                                             .buttonStyle(.link)
                                             .font(.caption)

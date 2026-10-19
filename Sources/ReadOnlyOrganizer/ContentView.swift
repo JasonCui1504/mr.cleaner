@@ -5,31 +5,34 @@ struct ContentView: View {
     @ObservedObject var controller: ScanController
     @State private var tab: Tab = .summary
     /// Shared between the file table and the other tabs ("show in table").
-    @State private var selectedRecordID: Int?
+    @State private var selectedRecordIDs: Set<Int> = []
 
-    enum Tab: Hashable { case summary, files, groups, organization }
+    enum Tab: Hashable { case summary, files, groups, organization, changes }
 
     var body: some View {
         VStack(spacing: 0) {
             HeaderBar(controller: controller)
-            SafetyBanner()
+            SafetyBanner(organizeMode: controller.organizeModeEnabled)
             Divider()
             TabView(selection: $tab) {
                 SummaryView(controller: controller)
                     .tabItem { Text("Dashboard") }
                     .tag(Tab.summary)
-                FileTableView(controller: controller, selection: $selectedRecordID)
+                FileTableView(controller: controller, selection: $selectedRecordIDs)
                     .tabItem { Text("Files") }
                     .tag(Tab.files)
                 GroupingView(controller: controller) { id in
-                    selectedRecordID = id
+                    selectedRecordIDs = [id]
                     tab = .files
                 }
                 .tabItem { Text("Groups") }
                 .tag(Tab.groups)
                 OrganizationView(controller: controller)
-                    .tabItem { Text("Suggested Organization (Preview)") }
+                    .tabItem { Text("Suggested Organization") }
                     .tag(Tab.organization)
+                ChangesView(controller: controller)
+                    .tabItem { Text("Changes (\(controller.moveLog.count))") }
+                    .tag(Tab.changes)
             }
             .padding(12)
         }
@@ -77,7 +80,8 @@ struct HeaderBar: View {
                 .disabled(controller.phase.isBusy)
 
                 Spacer()
-                StatusBadge()
+                OrganizeModeToggle(controller: controller)
+                StatusBadge(organizeMode: controller.organizeModeEnabled)
             }
 
             HStack(spacing: 6) {
@@ -114,6 +118,9 @@ struct StatusLine: View {
             case .analyzing:
                 ProgressView().controlSize(.small)
                 Text("Categorizing \(controller.progress.totalEntries) entries…")
+            case .organizing:
+                ProgressView().controlSize(.small)
+                Text("Creating folders and moving items…")
             case .finished:
                 Text("Scan complete: \(controller.progress.files) files, \(controller.progress.folders) folders"
                      + (controller.lastScanDuration.map { String(format: " in %.1fs", $0) } ?? ""))
@@ -129,25 +136,31 @@ struct StatusLine: View {
 }
 
 struct StatusBadge: View {
+    let organizeMode: Bool
+
     var body: some View {
-        Label(SafetyPolicy.headline, systemImage: "lock.shield")
+        let color = organizeMode ? Color.orange : Color.green
+        Label(organizeMode ? SafetyPolicy.organizeHeadline : SafetyPolicy.headline,
+              systemImage: organizeMode ? "folder.badge.gearshape" : "lock.shield")
             .font(.callout.weight(.semibold))
             .padding(.horizontal, 10)
             .padding(.vertical, 4)
-            .background(Capsule().fill(Color.green.opacity(0.15)))
-            .overlay(Capsule().stroke(Color.green.opacity(0.6)))
-            .help(SafetyPolicy.readEffectsNote)
+            .background(Capsule().fill(color.opacity(0.15)))
+            .overlay(Capsule().stroke(color.opacity(0.6)))
+            .help(organizeMode ? SafetyPolicy.organizeModeExplanation : SafetyPolicy.readEffectsNote)
     }
 }
 
 struct SafetyBanner: View {
+    let organizeMode: Bool
     @State private var expanded = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
             HStack(alignment: .top, spacing: 8) {
-                Image(systemName: "checkmark.shield").foregroundStyle(.green)
-                Text(SafetyPolicy.bannerText).font(.callout)
+                Image(systemName: organizeMode ? "folder.badge.gearshape" : "checkmark.shield")
+                    .foregroundStyle(organizeMode ? Color.orange : Color.green)
+                Text(organizeMode ? SafetyPolicy.organizeBannerText : SafetyPolicy.bannerText).font(.callout)
                 Spacer()
                 Button(expanded ? "Less" : "About reads") { expanded.toggle() }
                     .buttonStyle(.link)
@@ -161,6 +174,6 @@ struct SafetyBanner: View {
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 8)
-        .background(Color.green.opacity(0.07))
+        .background((organizeMode ? Color.orange : Color.green).opacity(0.07))
     }
 }

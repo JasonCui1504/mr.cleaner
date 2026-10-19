@@ -6,7 +6,8 @@ This document lists every filesystem, system, and network-relevant API used by t
 
 | Guarantee | How it is ensured |
 |---|---|
-| No file mutation | No mutating API appears in `Sources/` (checked by `testNoFileMutationAPIs`). All filesystem access is in `FolderScanner.swift` (`testFilesystemAccessIsConfinedToScanner`). The only `FileManager` methods used are `contentsOfDirectory` and `destinationOfSymbolicLink` (`testFileManagerUsageIsAllowListed`). |
+| No delete / rename / copy / edit | None of these APIs appear anywhere in `Sources/` (`testNoFileMutationAPIs`). |
+| Changes limited to "create folder" + "move" | `createDirectory` and `moveItem` appear only in `FileOrganizer.swift` (`testFolderCreationAndMovingOnlyInFileOrganizer`, `testFileManagerUsageIsAllowListed`), are reachable only when Organize mode is on (off at every launch, confirmation required), and never create intermediate folders (`testFileOrganizerNeverOverwritesOrCreatesIntermediates`). All other filesystem access is in `FolderScanner.swift`. |
 | No file contents read | No content-reading API (`Data(contentsOf:)`, `FileHandle`, `read(`, `mmap`, QuickLook, PDFKit, AVFoundation, hashing) appears in `Sources/` (`testNoFileContentReads`). |
 | No code execution | No `Process`, `NSTask`, `system`, `posix_spawn`, AppleScript, or `NSWorkspace` (`testNoProcessExecutionOrOpening`). |
 | Offline | No networking API, framework, or URL literal (`testNoNetworking`). `Package.swift` declares no dependencies (`testPackageHasNoDependencies`). Only Apple system frameworks are imported. |
@@ -49,6 +50,19 @@ App target (`Sources/ReadOnlyOrganizer/`):
 
 The app uses an AppKit lifecycle instead of a SwiftUI `App`/`WindowGroup` scene. SwiftUI scenes autosave window frames and restoration state to disk by default; the AppKit lifecycle avoids that.
 
+## Organize mode API inventory (complete)
+
+All in `Sources/OrganizerCore/FileOrganizer.swift`, called only when Organize mode is on:
+
+| API | Effect | Guards |
+|---|---|---|
+| `FileManager.createDirectory(at:withIntermediateDirectories: false, attributes: nil)` | Creates one empty folder **directly inside** the selected folder | Name must be valid (no `/`, `:`, leading `.`, or surrounding spaces). If something with that name exists it must be a real folder (not a file, link, or package); nothing is replaced. |
+| `FileManager.moveItem(at:to:)` | Moves one item into such a folder (or back, for Undo) | Source and destination are inside the selected folder; every parent is a real folder on the same disk (no symlinks, no other volumes); the name is unchanged; the destination must not exist (checked first, and `moveItem` itself fails rather than replacing); a folder can't move into itself. On the same disk this is a single `rename(2)` of the directory entry: contents and the item's own dates are untouched. |
+
+Not present anywhere: delete, trash, rename, copy, replace, write, set attributes or permissions, or create files. Moving to another disk is refused, because `moveItem` would implement it as copy + delete.
+
+The move log (for Undo) lives in memory only and is lost when you quit.
+
 ## Network API inventory
 
 None. The app makes no network requests, starts no server, and loads no remote content. It uses system fonts and SF Symbols only.
@@ -76,9 +90,9 @@ The app's code writes nothing. The operating system may still record some state 
 `scripts/bundle_app.sh --sandbox` produces an ad-hoc-signed `.app` with `Support/ReadOnlyOrganizer.entitlements`:
 
 - `com.apple.security.app-sandbox`
-- `com.apple.security.files.user-selected.read-only`
+- `com.apple.security.files.user-selected.read-write`
 
-With this profile, macOS denies any write to the selected folder and any outbound network connection, independent of the app's code. It is optional because it involves ad-hoc code signing and the container folder described above.
+With this profile, macOS denies any outbound network connection and any access outside the folder you pick, independent of the app's code. It allows read-write access to the picked folder so that Organize mode works. It is optional because it involves ad-hoc code signing and the container folder described above.
 
 ## Installing (`scripts/install_app.sh`)
 
