@@ -34,7 +34,7 @@ public final class ScanController: ObservableObject {
     @Published public private(set) var rowsVersion = 0
     @Published public private(set) var summary = ScanSummary()
     @Published public private(set) var plan: [PlannedFolder] = []
-    @Published public private(set) var overrides: [Int: Category] = [:]
+    @Published public private(set) var overrides: [Int: FileCategory] = [:]
     @Published public private(set) var reviewLater: Set<Int> = []
     @Published public private(set) var lastScanDuration: TimeInterval?
 
@@ -165,7 +165,7 @@ public final class ScanController: ObservableObject {
     }
 
     /// Sets (or with `nil`, clears) a session-only category for a file.
-    public func setCategoryOverride(_ category: Category?, for id: Int) {
+    public func setCategoryOverride(_ category: FileCategory?, for id: Int) {
         guard let base = baseClassification(for: id) else { return }
         if let category, category != base.category {
             overrides[id] = category

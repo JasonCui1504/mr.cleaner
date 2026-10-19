@@ -88,7 +88,7 @@ struct SummaryView: View {
         GroupBox("Files by primary category") {
             let total = max(summary.countsByCategory.values.reduce(0, +), 1)
             VStack(alignment: .leading, spacing: 6) {
-                ForEach(Category.allCases) { category in
+                ForEach(FileCategory.allCases) { category in
                     let count = summary.countsByCategory[category] ?? 0
                     if count > 0 {
                         HStack {

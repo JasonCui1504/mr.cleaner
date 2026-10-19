@@ -9,8 +9,8 @@ final class ClassifierTests: XCTestCase {
     }
 
     private func assertCategory(
-        _ name: String, _ category: Category, _ confidence: Confidence? = nil,
-        secondary: Category? = nil, file: StaticString = #filePath, line: UInt = #line
+        _ name: String, _ category: FileCategory, _ confidence: Confidence? = nil,
+        secondary: FileCategory? = nil, file: StaticString = #filePath, line: UInt = #line
     ) {
         let result = classify(name)
         XCTAssertEqual(result.category, category, "\(name): \(result.explanation)", file: file, line: line)

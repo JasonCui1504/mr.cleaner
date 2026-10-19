@@ -21,7 +21,7 @@ struct Keyword: Sendable {
 /// A topic category is driven by filename keywords, reinforced by type.
 struct TopicRule: Sendable {
     let id: String
-    let category: Category
+    let category: FileCategory
     /// Lower number wins ties.
     let priority: Int
     let keywords: [Keyword]

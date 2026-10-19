@@ -1,7 +1,7 @@
 import Foundation
 
 /// Primary categories, in documentation order. See docs/CATEGORY_RULES.md.
-public enum Category: String, Sendable, Hashable, CaseIterable, Identifiable, Comparable {
+public enum FileCategory: String, Sendable, Hashable, CaseIterable, Identifiable, Comparable {
     case financial = "Financial & Tax"
     case travel = "Travel & Reservations"
     case academic = "Academic & Coursework"
@@ -26,9 +26,9 @@ public enum Category: String, Sendable, Hashable, CaseIterable, Identifiable, Co
         self == .uncategorized ? "Uncategorized - Review" : rawValue
     }
 
-    public var order: Int { Category.allCases.firstIndex(of: self) ?? 0 }
+    public var order: Int { FileCategory.allCases.firstIndex(of: self) ?? 0 }
 
-    public static func < (lhs: Category, rhs: Category) -> Bool { lhs.order < rhs.order }
+    public static func < (lhs: FileCategory, rhs: FileCategory) -> Bool { lhs.order < rhs.order }
 }
 
 /// Strength of the rule evidence. Not a probability and not a model score.
@@ -52,8 +52,8 @@ public enum Confidence: Int, Sendable, Hashable, Comparable, CaseIterable {
 
 /// Result of the deterministic classifier for one file.
 public struct Classification: Sendable, Hashable {
-    public var category: Category
-    public var secondary: [Category]
+    public var category: FileCategory
+    public var secondary: [FileCategory]
     public var tags: [String]
     public var confidence: Confidence
     public var explanation: String
@@ -63,7 +63,7 @@ public struct Classification: Sendable, Hashable {
     public var isOverridden: Bool
 
     public init(
-        category: Category, secondary: [Category] = [], tags: [String] = [],
+        category: FileCategory, secondary: [FileCategory] = [], tags: [String] = [],
         confidence: Confidence, explanation: String, reviewReasons: [String] = [],
         ruleIDs: [String] = [], isOverridden: Bool = false
     ) {
@@ -80,7 +80,7 @@ public struct Classification: Sendable, Hashable {
     public var needsReview: Bool { !reviewReasons.isEmpty }
 
     /// Copy with a session-only category chosen by the user.
-    public func overridden(with newCategory: Category) -> Classification {
+    public func overridden(with newCategory: FileCategory) -> Classification {
         guard newCategory != category else { return self }
         var copy = self
         copy.secondary.removeAll { $0 == newCategory }

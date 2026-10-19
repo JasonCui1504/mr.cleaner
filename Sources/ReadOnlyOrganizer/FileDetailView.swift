@@ -69,13 +69,13 @@ struct FileDetailView: View {
     private var editSection: some View {
         GroupBox("Your edits") {
             VStack(alignment: .leading, spacing: 8) {
-                Picker("Category", selection: Binding<Category?>(
+                Picker("Category", selection: Binding<FileCategory?>(
                     get: { controller.overrides[recordID] },
                     set: { controller.setCategoryOverride($0, for: recordID) })) {
                     Text("Use rule result (\(controller.baseClassification(for: recordID)?.category.displayName ?? "—"))")
-                        .tag(Category?.none)
+                        .tag(FileCategory?.none)
                     Divider()
-                    ForEach(Category.allCases) { Text($0.displayName).tag(Category?.some($0)) }
+                    ForEach(FileCategory.allCases) { Text($0.displayName).tag(FileCategory?.some($0)) }
                 }
                 Toggle("Review later", isOn: Binding(
                     get: { controller.reviewLater.contains(recordID) },

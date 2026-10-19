@@ -73,7 +73,7 @@ public enum HiddenFilter: String, CaseIterable, Identifiable, Sendable {
 
 public struct FilterCriteria: Equatable, Sendable {
     public var searchText = ""
-    public var category: Category?
+    public var category: FileCategory?
     /// Lowercased extension, "" = any.
     public var fileType = ""
     public var kind: KindFilter = .all

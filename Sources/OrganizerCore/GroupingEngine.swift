@@ -52,7 +52,7 @@ public struct GroupingEngine: Sendable {
     /// - Parameters:
     ///   - categories: rule category per record id (`nil` for folders).
     ///   - rootName: display name for a project at the selected root.
-    public func run(records: [FileRecord], categories: [Category?], rootName: String) -> Output {
+    public func run(records: [FileRecord], categories: [FileCategory?], rootName: String) -> Output {
         let projectsOutput = detectProjects(records: records, rootName: rootName)
         var groups: [FileGroup] = []
         groups += projectsOutput.groups
@@ -239,7 +239,7 @@ public struct GroupingEngine: Sendable {
 
     // MARK: Same-day clusters (same folder, same category, supporting name signal)
 
-    private func sameDayGroups(_ files: [FileRecord], categories: [Category?]) -> [FileGroup] {
+    private func sameDayGroups(_ files: [FileRecord], categories: [FileCategory?]) -> [FileGroup] {
         var calendar = Calendar(identifier: .gregorian)
         calendar.timeZone = .current
         var buckets: [String: [FileRecord]] = [:]
@@ -278,13 +278,13 @@ public struct GroupingEngine: Sendable {
 
     // MARK: Folder themes (≥5 files, ≥80% one category)
 
-    private func folderThemeGroups(_ files: [FileRecord], categories: [Category?]) -> [FileGroup] {
+    private func folderThemeGroups(_ files: [FileRecord], categories: [FileCategory?]) -> [FileGroup] {
         var byFolder: [String: [FileRecord]] = [:]
         for file in files { byFolder[file.parentRelativePath, default: []].append(file) }
         return byFolder.compactMap { entry -> FileGroup? in
             let (folder, members) = (entry.key, entry.value)
             guard members.count >= 5 else { return nil }
-            var counts: [Category: Int] = [:]
+            var counts: [FileCategory: Int] = [:]
             for member in members where member.id < categories.count {
                 if let category = categories[member.id] { counts[category, default: 0] += 1 }
             }

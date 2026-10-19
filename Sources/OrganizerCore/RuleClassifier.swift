@@ -82,8 +82,8 @@ public struct RuleClassifier: Sendable {
         var ruleIDs: [String] = []
         var reasons: [String] = []
         var reviewReasons: [String] = []
-        var secondary: [Category] = []
-        let category: Category
+        var secondary: [FileCategory] = []
+        let category: FileCategory
         var confidence: Confidence
 
         if let best = hits.first,
@@ -233,7 +233,7 @@ public struct RuleClassifier: Sendable {
     // MARK: Type evaluation
 
     private struct TypeMatch {
-        let category: Category
+        let category: FileCategory
         let confidence: Confidence
         let ruleID: String
         let reason: String

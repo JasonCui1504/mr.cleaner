@@ -24,7 +24,7 @@ public struct ScanSummary: Sendable, Equatable {
     public var symbolicLinks = 0
     public var otherEntries = 0
     public var totalBytes: Int64 = 0
-    public var countsByCategory: [Category: Int] = [:]
+    public var countsByCategory: [FileCategory: Int] = [:]
     public var unavailableCreationDates = 0
     public var needsReview = 0
     public var potentialDuplicateGroups = 0

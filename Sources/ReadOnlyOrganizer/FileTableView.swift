@@ -103,8 +103,8 @@ struct FilterBar: View {
                     .textFieldStyle(.roundedBorder)
                     .frame(minWidth: 220)
                 Picker("Category", selection: $criteria.category) {
-                    Text("All categories").tag(Category?.none)
-                    ForEach(Category.allCases) { Text($0.displayName).tag(Category?.some($0)) }
+                    Text("All categories").tag(FileCategory?.none)
+                    ForEach(FileCategory.allCases) { Text($0.displayName).tag(FileCategory?.some($0)) }
                 }
                 .frame(maxWidth: 260)
                 Picker("Type", selection: $criteria.fileType) {
