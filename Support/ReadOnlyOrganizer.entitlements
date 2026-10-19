@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <!-- Optional App Sandbox profile (used only when scripts/bundle_app.sh is run with its sandbox option).
+         Grants read-only access to folders the user picks in the open panel.
+         No network entitlements are present, so the sandbox blocks all
+         network access. No write entitlements are present. -->
+    <key>com.apple.security.app-sandbox</key>
+    <true/>
+    <key>com.apple.security.files.user-selected.read-only</key>
+    <true/>
+</dict>
+</plist>
