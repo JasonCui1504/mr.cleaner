@@ -180,6 +180,50 @@ final class OrganizeModeControllerTests: XCTestCase {
         XCTAssertTrue(controller.moveLog.isEmpty)
     }
 
+    func testQuickFoldersCreateFoldersAndMovesKeepRowIdentity() async throws {
+        let (controller, root) = try await scanned("quick", files: ["a/photo.jpg", "a/notes.txt"])
+        controller.organizeModeEnabled = true
+        controller.addQuickFolder(named: "Keep")
+        try await waitUntilIdle(controller)
+        XCTAssertEqual(controller.quickFolders, ["Trash", "Keep"])
+        XCTAssertNotNil(LStat(url: root.appendingPathComponent("Keep")))
+        XCTAssertTrue(controller.records.contains { $0.relativePath == "Keep" && $0.kind == .directory })
+
+        let id = try XCTUnwrap(controller.records.first { $0.name == "photo.jpg" }?.id)
+        controller.setReviewLater(true, for: id)
+        controller.move(recordIDs: [id], toFolderNamed: "Keep")
+        try await waitUntilIdle(controller)
+        XCTAssertEqual(controller.record(id)?.relativePath, "Keep/photo.jpg", "same row id, new location")
+        XCTAssertTrue(controller.reviewLater.contains(id), "session edits survive a move")
+        XCTAssertNotNil(LStat(url: root.appendingPathComponent("Keep/photo.jpg")))
+
+        controller.removeQuickFolder("Keep")
+        XCTAssertEqual(controller.quickFolders, ["Trash"])
+        XCTAssertNotNil(LStat(url: root.appendingPathComponent("Keep")), "removing a button never touches the disk")
+    }
+
+    func testMovingAFolderUpdatesItsChildren() async throws {
+        let (controller, _) = try await scanned("folder-move", files: ["old/x.txt", "old/sub/y.txt"])
+        controller.organizeModeEnabled = true
+        let folderID = try XCTUnwrap(controller.records.first { $0.relativePath == "old" }?.id)
+        let childID = try XCTUnwrap(controller.records.first { $0.name == "y.txt" }?.id)
+        controller.move(recordIDs: [folderID], toFolderNamed: "Trash")
+        try await waitUntilIdle(controller)
+        XCTAssertEqual(controller.record(folderID)?.relativePath, "Trash/old")
+        XCTAssertEqual(controller.record(childID)?.relativePath, "Trash/old/sub/y.txt")
+        XCTAssertEqual(controller.record(childID)?.parentRelativePath, "Trash/old/sub")
+    }
+
+    func testInvalidQuickFolderNameIsRejected() async throws {
+        let (controller, root) = try await scanned("badname", files: ["f.txt"])
+        controller.organizeModeEnabled = true
+        controller.addQuickFolder(named: "../escape")
+        try await waitUntilIdle(controller)
+        XCTAssertEqual(controller.quickFolders, ["Trash"])
+        XCTAssertNotNil(controller.lastOrganizeReport?.skipped.first)
+        XCTAssertNil(LStat(url: root.deletingLastPathComponent().appendingPathComponent("escape")))
+    }
+
     func testApplyPlanSkipsProjectsAndExistingNames() async throws {
         let (controller, root) = try await scanned("apply", files: [
             "invoice.pdf", "Downloads/IMG_0001.jpg", "app/package.json", "app/src/index.js",

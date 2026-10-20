@@ -8,15 +8,18 @@ struct FileTableView: View {
     @State private var criteria = FilterCriteria()
     @State private var sortOrder: [KeyPathComparator<FileRow>] = [KeyPathComparator(\FileRow.relativePath)]
     @State private var displayed: [FileRow] = []
+    /// Row under the mouse, to reveal its move buttons.
+    @State private var hoveredRowID: Int?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             FilterBar(criteria: $criteria, extensions: controller.availableExtensions)
             if controller.organizeModeEnabled {
+                QuickFolderBar(controller: controller)
                 HStack(spacing: 10) {
                     MoveMenu(controller: controller, ids: selectedIDs)
                     Text(selection.isEmpty
-                         ? "Select rows (⌘-click or ⇧-click for several) to move them."
+                         ? "Hover a row and click a folder button to move it there, or select several rows (⌘-click / ⇧-click) and use this menu."
                          : "\(selection.count) selected. Items keep their names; nothing is overwritten.")
                         .font(.caption).foregroundStyle(.secondary)
                     Spacer()
@@ -34,8 +37,16 @@ struct FileTableView: View {
                                 .foregroundStyle(row.isFolder ? Color.accentColor : Color.secondary)
                         }
                         .help(row.relativePath)
+                        .rowHover(row.id, $hoveredRowID)
                     }
                     .width(min: 160, ideal: 260)
+                    TableColumn("Move to") { row in
+                        QuickMoveButtons(
+                            controller: controller, recordID: row.id,
+                            highlighted: hoveredRowID == row.id || selection.contains(row.id))
+                            .rowHover(row.id, $hoveredRowID)
+                    }
+                    .width(min: 60, ideal: 240)
                     TableColumn("Category", value: \.categoryName) { row in
                         HStack(spacing: 4) {
                             Text(row.categoryName)
@@ -43,6 +54,7 @@ struct FileTableView: View {
                                 Image(systemName: "flag.fill").foregroundStyle(.orange).help("Review candidate")
                             }
                         }
+                        .rowHover(row.id, $hoveredRowID)
                     }
                     .width(min: 120, ideal: 180)
                     TableColumn("Type", value: \.typeName)
@@ -60,8 +72,10 @@ struct FileTableView: View {
                         Text(row.modifiedText).monospacedDigit()
                     }
                     .width(min: 120, ideal: 170)
-                    TableColumn("Relative Path", value: \.relativePath)
-                        .width(min: 160, ideal: 300)
+                    TableColumn("Relative Path", value: \.relativePath) { row in
+                        Text(row.relativePath).rowHover(row.id, $hoveredRowID)
+                    }
+                    .width(min: 160, ideal: 300)
                     TableColumn("Confidence", value: \.confidenceRank) { row in
                         Text(row.confidenceText)
                     }
@@ -185,5 +199,20 @@ struct OptionalDatePicker: View {
                     .frame(width: 110)
             }
         }
+    }
+}
+
+private extension View {
+    /// Fills the cell and reports when the mouse is over this row.
+    func rowHover(_ id: Int, _ hovered: Binding<Int?>) -> some View {
+        frame(maxWidth: .infinity, alignment: .leading)
+            .contentShape(Rectangle())
+            .onHover { inside in
+                if inside {
+                    hovered.wrappedValue = id
+                } else if hovered.wrappedValue == id {
+                    hovered.wrappedValue = nil
+                }
+            }
     }
 }

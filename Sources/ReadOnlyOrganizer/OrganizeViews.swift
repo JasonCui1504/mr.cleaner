@@ -43,6 +43,13 @@ struct MoveMenu: View {
             } label: {
                 Label("“\(FileOrganizer.trashFolderName)” folder (you empty it yourself)", systemImage: "trash")
             }
+            ForEach(controller.quickFolders.filter { $0 != FileOrganizer.trashFolderName }, id: \.self) { folder in
+                Button {
+                    controller.move(recordIDs: ids, toFolderNamed: folder)
+                } label: {
+                    Label(folder, systemImage: "folder")
+                }
+            }
             Divider()
             ForEach(FileCategory.allCases) { category in
                 Button(category.suggestedFolderName) {
@@ -193,5 +200,87 @@ struct ApplyPlanSheet: View {
         }
         .padding(20)
         .frame(width: 600)
+    }
+}
+
+/// "Your folders" bar: create folders and choose which ones appear as
+/// one-click buttons on every row.
+struct QuickFolderBar: View {
+    @ObservedObject var controller: ScanController
+    @State private var newFolderName = ""
+
+    private var trimmedName: String { newFolderName.trimmingCharacters(in: .whitespacesAndNewlines) }
+
+    var body: some View {
+        HStack(spacing: 8) {
+            Text("Your folders:").font(.callout.weight(.medium))
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 6) {
+                    ForEach(controller.quickFolders, id: \.self) { folder in
+                        HStack(spacing: 4) {
+                            Image(systemName: folder == FileOrganizer.trashFolderName ? "trash" : "folder")
+                            Text(folder)
+                            if folder != FileOrganizer.trashFolderName {
+                                Button {
+                                    controller.removeQuickFolder(folder)
+                                } label: {
+                                    Image(systemName: "xmark.circle.fill").foregroundStyle(.secondary)
+                                }
+                                .buttonStyle(.plain)
+                                .help("Remove this button (the folder on disk is not touched)")
+                            }
+                        }
+                        .font(.callout)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 3)
+                        .background(Capsule().fill(Color.accentColor.opacity(0.12)))
+                    }
+                }
+            }
+            TextField("New folder name", text: $newFolderName)
+                .textFieldStyle(.roundedBorder)
+                .frame(width: 180)
+                .onSubmit(create)
+            Button("Create Folder", action: create)
+                .disabled(!FileOrganizer.isValidFolderName(trimmedName) || controller.phase.isBusy)
+        }
+    }
+
+    private func create() {
+        guard FileOrganizer.isValidFolderName(trimmedName) else { return }
+        controller.addQuickFolder(named: trimmedName)
+        newFolderName = ""
+    }
+}
+
+/// One-click "move here" buttons for a row, one per folder in the bar.
+/// Faint until you hover the row (or select it), so the table stays readable.
+struct QuickMoveButtons: View {
+    @ObservedObject var controller: ScanController
+    let recordID: Int
+    let highlighted: Bool
+
+    var body: some View {
+        if controller.organizeModeEnabled, let record = controller.record(recordID) {
+            HStack(spacing: 4) {
+                ForEach(controller.quickFolders, id: \.self) { folder in
+                    Button {
+                        controller.move(recordIDs: [recordID], toFolderNamed: folder)
+                    } label: {
+                        if folder == FileOrganizer.trashFolderName {
+                            Label(folder, systemImage: "trash")
+                        } else {
+                            Text(folder)
+                        }
+                    }
+                    .buttonStyle(.bordered)
+                    .controlSize(.small)
+                    .disabled(controller.phase.isBusy || record.parentRelativePath == folder || record.relativePath == folder)
+                    .help("Move “\(record.name)” into “\(folder)”")
+                }
+            }
+            .opacity(highlighted ? 1 : 0.18)
+            .allowsHitTesting(highlighted)
+        }
     }
 }

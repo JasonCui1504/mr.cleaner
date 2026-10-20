@@ -48,6 +48,9 @@ public final class ScanController: ObservableObject {
     /// Moves made this session (newest last), for Undo. In memory only.
     @Published public private(set) var moveLog: [FileOrganizer.Move] = []
     @Published public private(set) var lastOrganizeReport: OrganizeReport?
+    /// Folders shown as one-click "move here" buttons on every row. Names only,
+    /// kept in memory; the folders themselves live inside the selected folder.
+    @Published public private(set) var quickFolders: [String] = [FileOrganizer.trashFolderName]
 
     @Published public var options = ScanOptions()
     @Published public var thresholds = SummaryThresholds() {
@@ -58,6 +61,7 @@ public final class ScanController: ObservableObject {
     private var projectByRecord: [Int: String] = [:]
     private var groupsByRecord: [Int: [Int]] = [:]
     private var scanTask: Task<Void, Never>?
+    private var resultsArePartial = false
     private var cancellation: CancellationFlag?
 
     public init() {}
@@ -113,7 +117,7 @@ public final class ScanController: ObservableObject {
         progress = newProgress
     }
 
-    private func finish(_ outcome: Result<AnalysisResult, Error>) {
+    private func finish(_ outcome: Result<AnalysisResult, Error>, isRefresh: Bool = false) {
         scanTask = nil
         switch outcome {
         case .failure(let error):
@@ -131,7 +135,8 @@ public final class ScanController: ObservableObject {
                 for member in group.memberIDs { index[member, default: []].append(groupIndex) }
             }
             groupsByRecord = index
-            lastScanDuration = scan.finishedAt.timeIntervalSince(scan.startedAt)
+            if !isRefresh { lastScanDuration = scan.finishedAt.timeIntervalSince(scan.startedAt) }
+            resultsArePartial = scan.wasCancelled
             var final = ScanProgress()
             final.files = records.filter { $0.kind.isFileLike }.count
             final.folders = records.filter { $0.kind == .directory }.count
@@ -290,7 +295,90 @@ public final class ScanController: ObservableObject {
         }
         lastOrganizeReport = OrganizeReport(title: description, outcomes: outcomes)
         phase = .finished
-        startScan()   // refresh results so they match the new layout
+        refreshAfterChanges(moves: completed, newFolders: [])
+    }
+
+    // MARK: Quick folders
+
+    /// Adds a folder to the row buttons and, in Organize mode, creates it
+    /// directly inside the selected folder (if it doesn't exist yet).
+    public func addQuickFolder(named rawName: String) {
+        let name = rawName.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard FileOrganizer.isValidFolderName(name) else {
+            lastOrganizeReport = OrganizeReport(title: "Create folder", outcomes: [
+                OrganizeReport.Outcome(path: name, error: FileOrganizer.OrganizeError.invalidFolderName(name)),
+            ])
+            return
+        }
+        if !quickFolders.contains(name) { quickFolders.append(name) }
+        guard organizeModeEnabled, let root = rootURL, !phase.isBusy else { return }
+        phase = .organizing
+        Task.detached(priority: .userInitiated) {
+            let outcome: OrganizeReport.Outcome
+            do {
+                let folder = try FileOrganizer(root: root).ensureFolder(named: name)
+                outcome = OrganizeReport.Outcome(path: folder.path, error: nil)
+            } catch {
+                outcome = OrganizeReport.Outcome(path: root.appendingPathComponent(name).path, error: error)
+            }
+            await MainActor.run {
+                self.lastOrganizeReport = OrganizeReport(title: "Create folder “\(name)”", outcomes: [outcome])
+                self.phase = .finished
+                self.refreshAfterChanges(moves: [], newFolders: outcome.errorMessage == nil ? [outcome.path] : [])
+            }
+        }
+    }
+
+    /// Removes a folder from the row buttons only. The folder on disk is untouched.
+    public func removeQuickFolder(_ name: String) {
+        quickFolders.removeAll { $0 == name }
+    }
+
+    // MARK: Refresh after organizing
+
+    /// Updates the in-memory records to match completed moves (paths only;
+    /// ids stay stable so selections and edits survive), adds records for new
+    /// folders, then re-runs classification and grouping in the background.
+    private func refreshAfterChanges(moves: [FileOrganizer.Move], newFolders: [String]) {
+        guard let root = rootURL, !records.isEmpty || !newFolders.isEmpty || !moves.isEmpty else { return }
+        let rootPath = root.path
+        var updated = records
+        var index = Dictionary(updated.map { ($0.path, $0.id) }, uniquingKeysWith: { first, _ in first })
+        let scanner = FolderScanner(options: options)
+
+        func ensureFolderRecord(_ path: String) {
+            guard path != rootPath, path.hasPrefix(rootPath + "/"), index[path] == nil,
+                  let record = scanner.record(at: URL(fileURLWithPath: path), id: updated.count, root: root) else { return }
+            updated.append(record)
+            index[record.path] = record.id
+        }
+
+        newFolders.forEach(ensureFolderRecord)
+        for move in moves {
+            ensureFolderRecord(URL(fileURLWithPath: move.toPath).deletingLastPathComponent().path)
+            guard let id = index[move.fromPath] else { continue }
+            if updated[id].kind == .directory {
+                let oldPrefix = move.fromPath + "/"
+                for i in updated.indices where updated[i].path == move.fromPath || updated[i].path.hasPrefix(oldPrefix) {
+                    let newPath = move.toPath + updated[i].path.dropFirst(move.fromPath.count)
+                    index[updated[i].path] = nil
+                    updated[i] = updated[i].relocated(toPath: newPath, rootPath: rootPath)
+                    index[newPath] = i
+                }
+            } else {
+                index[move.fromPath] = nil
+                updated[id] = updated[id].relocated(toPath: move.toPath, rootPath: rootPath)
+                index[move.toPath] = id
+            }
+        }
+
+        phase = .analyzing
+        let scan = ScanResult(rootPath: rootPath, records: updated, issues: issues,
+                              wasCancelled: resultsArePartial, startedAt: Date(), finishedAt: Date())
+        scanTask = Task.detached(priority: .userInitiated) {
+            let analysis = Analyzer.analyze(scan)
+            await MainActor.run { self.finish(.success(analysis), isRefresh: true) }
+        }
     }
 
     // MARK: Derived data
@@ -340,6 +428,12 @@ public struct OrganizeReport: Sendable {
         public let move: FileOrganizer.Move?
         public let errorMessage: String?
 
+        public init(path: String, error: Error?) {
+            self.path = path
+            self.move = nil
+            self.errorMessage = error?.localizedDescription
+        }
+
         public init(path: String, result: Result<FileOrganizer.Move, Error>) {
             self.path = path
             switch result {
@@ -357,6 +451,6 @@ public struct OrganizeReport: Sendable {
     public let outcomes: [Outcome]
     public let date = Date()
 
-    public var movedCount: Int { outcomes.filter { $0.errorMessage == nil }.count }
+    public var movedCount: Int { outcomes.filter { $0.move != nil }.count }
     public var skipped: [Outcome] { outcomes.filter { $0.errorMessage != nil } }
 }

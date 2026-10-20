@@ -5,12 +5,14 @@ import OrganizerCore
 struct FileDetailView: View {
     @ObservedObject var controller: ScanController
     let recordID: Int
+    @State private var showPreview = true
 
     var body: some View {
         if let record = controller.record(recordID) {
             ScrollView {
                 VStack(alignment: .leading, spacing: 14) {
                     header(record)
+                    previewSection(record)
                     if let classification = controller.effectiveClassification(for: recordID) {
                         categorySection(classification)
                         editSection
@@ -20,6 +22,39 @@ struct FileDetailView: View {
                 }
                 .padding(10)
                 .frame(maxWidth: .infinity, alignment: .leading)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func previewSection(_ record: FileRecord) -> some View {
+        if record.kind.isFileLike {
+            GroupBox {
+                VStack(alignment: .leading, spacing: 6) {
+                    HStack {
+                        Text("Preview").font(.callout.weight(.medium))
+                        Spacer()
+                        Button(showPreview ? "Hide" : "Show") { showPreview.toggle() }
+                            .buttonStyle(.link)
+                    }
+                    if !showPreview {
+                        EmptyView()
+                    } else if record.access == .cloudPlaceholder {
+                        Text("Stored in iCloud only. Not previewed, so nothing is downloaded.")
+                            .font(.caption).foregroundStyle(.secondary)
+                    } else if record.access == .notReadable {
+                        Text("No permission to read this file.")
+                            .font(.caption).foregroundStyle(.secondary)
+                    } else {
+                        FilePreviewView(url: URL(fileURLWithPath: record.path))
+                            .id(record.path)
+                            .frame(height: 280)
+                            .clipShape(RoundedRectangle(cornerRadius: 6))
+                        Text("Quick Look preview (read-only, the same as Space in Finder).")
+                            .font(.caption2).foregroundStyle(.secondary)
+                    }
+                }
+                .padding(4)
             }
         }
     }

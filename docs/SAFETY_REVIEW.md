@@ -8,7 +8,7 @@ This document lists every filesystem, system, and network-relevant API used by t
 |---|---|
 | No delete / rename / copy / edit | None of these APIs appear anywhere in `Sources/` (`testNoFileMutationAPIs`). |
 | Changes limited to "create folder" + "move" | `createDirectory` and `moveItem` appear only in `FileOrganizer.swift` (`testFolderCreationAndMovingOnlyInFileOrganizer`, `testFileManagerUsageIsAllowListed`), are reachable only when Organize mode is on (off at every launch, confirmation required), and never create intermediate folders (`testFileOrganizerNeverOverwritesOrCreatesIntermediates`). All other filesystem access is in `FolderScanner.swift`. |
-| No file contents read | No content-reading API (`Data(contentsOf:)`, `FileHandle`, `read(`, `mmap`, QuickLook, PDFKit, AVFoundation, hashing) appears in `Sources/` (`testNoFileContentReads`). |
+| No file contents read by the app | No content-reading API (`Data(contentsOf:)`, `FileHandle`, `read(`, `mmap`, PDFKit, AVFoundation, hashing) appears in `Sources/` (`testNoFileContentReads`). The only content access is the Quick Look preview of the one file you select, confined to `FilePreview.swift` (`testQuickLookPreviewOnlyInFilePreview`). |
 | No code execution | No `Process`, `NSTask`, `system`, `posix_spawn`, AppleScript, or `NSWorkspace` (`testNoProcessExecutionOrOpening`). |
 | Offline | No networking API, framework, or URL literal (`testNoNetworking`). `Package.swift` declares no dependencies (`testPackageHasNoDependencies`). Only Apple system frameworks are imported. |
 | No persistence | No `UserDefaults` writes, `@AppStorage`, `@SceneStorage`, Core Data, SQLite, bookmarks, window frame autosave, temp/cache/support directories, or logging (`testNoPersistence`). |
@@ -25,6 +25,7 @@ This document lists every filesystem, system, and network-relevant API used by t
 | Combine | `ScanController.swift` | `ObservableObject` / `@Published` |
 | AppKit | app | `NSApplication`, `NSWindow`, `NSOpenPanel`, menus |
 | SwiftUI | app | views |
+| Quartz (QuickLookUI) | `FilePreview.swift` | read-only preview of the selected file |
 
 There are no third-party dependencies.
 
@@ -62,6 +63,10 @@ All in `Sources/OrganizerCore/FileOrganizer.swift`, called only when Organize mo
 Not present anywhere: delete, trash, rename, copy, replace, write, set attributes or permissions, or create files. Moving to another disk is refused, because `moveItem` would implement it as copy + delete.
 
 The move log (for Undo) lives in memory only and is lost when you quit.
+
+## Preview (Quick Look)
+
+`Sources/ReadOnlyOrganizer/FilePreview.swift` embeds `QLPreviewView` (Quartz / QuickLookUI) for the file selected in the Files tab. It is the same read-only previewer Finder uses for Space-bar previews: macOS reads the file to render it and does not modify it. The app never previews iCloud-only placeholders or unreadable files. Quick Look's renderers run in macOS's own sandboxed helper processes, and macOS may keep preview thumbnails in its system Quick Look cache. That is macOS's own cache, not app data. Hide the preview with the **Hide** link in the detail pane.
 
 ## Network API inventory
 

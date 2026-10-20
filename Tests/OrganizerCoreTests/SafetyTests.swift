@@ -82,9 +82,23 @@ final class SafetyTests: XCTestCase {
         // Version 1 never opens file contents (no hashing, no previews).
         try assertNoMatches([
             #"Data\(contentsOf"#, #"String\(contentsOf"#, #"contentsOfFile"#, #"FileHandle"#, #"InputStream"#,
-            #"(?<![.\w])fread\("#, #"(?<![.\w])read\("#, #"(?<![.\w])mmap\("#, #"QLThumbnail"#, #"QuickLook"#, #"CGImageSource"#,
+            #"(?<![.\w])fread\("#, #"(?<![.\w])read\("#, #"(?<![.\w])mmap\("#, #"CGImageSource"#,
             #"NSImage\(contentsOf"#, #"PDFDocument"#, #"AVAsset"#, #"CryptoKit"#, #"CommonCrypto"#, #"\bSHA256\b"#, #"\bMD5\b"#,
         ], "File content read in app sources")
+    }
+
+    func testQuickLookPreviewOnlyInFilePreview() throws {
+        // Previews (the only content reads) go through macOS Quick Look, only
+        // for the file the user selects, and only from FilePreview.swift.
+        let regex = try NSRegularExpression(pattern: #"QuickLook|QLPreview|QLThumbnail|import\s+Quartz"#)
+        var files = Set<String>()
+        for sourceLine in try codeLines() {
+            let text = sourceLine.text
+            if regex.firstMatch(in: text, range: NSRange(text.startIndex..., in: text)) != nil {
+                files.insert(sourceLine.file)
+            }
+        }
+        XCTAssertEqual(files, ["FilePreview.swift"])
     }
 
     func testNoProcessExecutionOrOpening() throws {

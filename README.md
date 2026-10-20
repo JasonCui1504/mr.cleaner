@@ -51,7 +51,7 @@ Tests create synthetic files only under `Tests/Fixtures/Generated/` (git-ignored
 2. **Scan Folder** lists that folder and its subfolders. A scan never starts on its own. **Stop Scan** cancels and keeps partial results.
 3. Tabs:
    - **Dashboard**: totals, size, counts per category, review candidates, potential duplicates, large/old/recent files (thresholds adjustable for the session), category breakdown, top file types, largest and most recently modified files, and skipped/inaccessible paths.
-   - **Files**: a sortable, virtualized table (Name, Category, Type, Size, Created, Modified, Relative Path, Confidence) with search and filters (category, type, kind, date range, size range, hidden, needs-review). Select a row to see its metadata, the category rationale, matched rule IDs, and session-only edits (change category, mark "Review later").
+   - **Files**: click a file to see a **Quick Look preview** (the same read-only viewer as Space in Finder), plus a sortable, virtualized table (Name, Category, Type, Size, Created, Modified, Relative Path, Confidence) with search and filters (category, type, kind, date range, size range, hidden, needs-review). Select a row to see its metadata, the category rationale, matched rule IDs, and session-only edits (change category, mark "Review later").
    - **Groups**: potential duplicates (name + size), version clusters, same-name-different-format, software projects, shared prefixes, keyword-related files, same-day clusters, and folder themes, each with its reason.
    - **Suggested Organization**: suggested destination paths next to each file's current path. In Organize mode, **Create Folders and Move Files…** lets you pick which suggested folders to create and fill. Software projects and files already in place are left alone.
    - **Changes**: every move made this session, with **Undo** and **Undo All Moves**, plus what was skipped and why.
@@ -60,7 +60,8 @@ Tests create synthetic files only under `Tests/Fixtures/Generated/` (git-ignored
 
 1. Flip the **Organize mode** switch in the toolbar and confirm.
 2. Move things in any of these ways:
-   - **Files tab**: select one or more rows (⌘-click / ⇧-click), then **Move N items to…** → `Trash` folder, a suggested category folder, or **New Folder…**.
+   - **Files tab, one click per file**: type a name in **Your folders** and click **Create Folder** (make as many as you like; `Trash` is always there). Each row's **Move to** column then has one button per folder: hover the row and click the folder you want.
+   - **Files tab, several at once**: select rows (⌘-click / ⇧-click), then **Move N items to…** → one of your folders, a suggested category folder, or **New Folder…**.
    - **Groups tab**: on potential duplicates, **Move to "Trash" folder** next to each copy.
    - **Suggested Organization tab**: **Create Folders and Move Files…**, choose folders, confirm.
 3. The folder is rescanned automatically after each action.
@@ -72,7 +73,7 @@ What a move changes: the item's location, the modification time of the two folde
 
 ## What is read
 
-For each entry, only filesystem metadata: name, extension, kind (file/folder/link/package/other), size, birth ("Created"), content modification ("Modified"), status change ("Metadata changed"), last access, hidden flag, readability, cloud placeholder status, and the system type for the extension. **File contents are never opened** (no hashing, no previews, no thumbnails).
+Scanning reads only filesystem metadata. The one exception is the **preview** of the single file you select, which macOS Quick Look renders read-only. iCloud-only files are never previewed, so nothing is downloaded. For each entry, the scan reads only: name, extension, kind (file/folder/link/package/other), size, birth ("Created"), content modification ("Modified"), status change ("Metadata changed"), last access, hidden flag, readability, cloud placeholder status, and the system type for the extension. Scanning never opens file contents: no hashing, and no thumbnails written by the app.
 
 - Symbolic links are listed but never followed. Their target text is shown, along with a note if it points outside the selected folder.
 - Packages (`.app`, `.key`, `.photoslibrary`, …) are treated as single items.

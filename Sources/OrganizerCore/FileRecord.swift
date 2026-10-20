@@ -109,6 +109,20 @@ public struct FileRecord: Identifiable, Sendable, Hashable {
 
     /// Name without extension.
     public var stem: String { NameAnalysis.splitExtension(name).stem }
+
+    /// The same entry at a new location (after a move in Organize mode). The
+    /// name and all metadata are kept; only the path fields change.
+    func relocated(toPath newPath: String, rootPath: String) -> FileRecord {
+        let relative = String(newPath.dropFirst(rootPath.count + 1))
+        let components = relative.split(separator: "/")
+        return FileRecord(
+            id: id, name: name, fileExtension: fileExtension, kind: kind, path: newPath,
+            relativePath: relative, parentRelativePath: components.dropLast().joined(separator: "/"),
+            depth: components.count, size: size, created: created, modified: modified,
+            metadataChanged: metadataChanged, accessed: accessed, isHidden: isHidden, access: access,
+            typeIdentifier: typeIdentifier, typeDescription: typeDescription, mimeType: mimeType,
+            symlinkTarget: symlinkTarget, symlinkPointsOutsideRoot: symlinkPointsOutsideRoot, notes: notes)
+    }
 }
 
 /// A problem encountered while scanning (permission denied, vanished entry…).

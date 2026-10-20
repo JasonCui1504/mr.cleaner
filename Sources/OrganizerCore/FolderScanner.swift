@@ -192,6 +192,20 @@ public struct FolderScanner: Sendable {
             wasCancelled: cancellation.isCancelled, startedAt: started, finishedAt: Date())
     }
 
+    /// Metadata record for one entry inside `root` (used to add a folder that
+    /// Organize mode just created, without rescanning everything).
+    func record(at url: URL, id: Int, root: URL) -> FileRecord? {
+        let rootURL = root.standardizedFileURL
+        let url = url.standardizedFileURL
+        guard url.path.hasPrefix(rootURL.path + "/"), let info = LStat(url: url) else { return nil }
+        let relative = String(url.path.dropFirst(rootURL.path.count + 1))
+        let components = relative.split(separator: "/")
+        return makeRecord(
+            id: id, url: url, name: url.lastPathComponent, relative: relative,
+            parentRelative: components.dropLast().joined(separator: "/"), depth: components.count,
+            info: info, rootURL: rootURL, cancellation: CancellationFlag()).0
+    }
+
     // MARK: Record construction
 
     private func makeRecord(
