@@ -30,6 +30,8 @@ struct OrganizeModeToggle: View {
 struct MoveMenu: View {
     @ObservedObject var controller: ScanController
     let ids: [Int]
+    /// Called after a move is started, e.g. to select the next row.
+    var onMove: () -> Void = {}
 
     @State private var askingForName = false
     @State private var newFolderName = ""
@@ -39,13 +41,13 @@ struct MoveMenu: View {
     var body: some View {
         Menu {
             Button {
-                controller.move(recordIDs: ids, toFolderNamed: FileOrganizer.trashFolderName)
+                move(to: FileOrganizer.trashFolderName)
             } label: {
                 Label("“\(FileOrganizer.trashFolderName)” folder (you empty it yourself)", systemImage: "trash")
             }
             ForEach(controller.quickFolders.filter { $0 != FileOrganizer.trashFolderName }, id: \.self) { folder in
                 Button {
-                    controller.move(recordIDs: ids, toFolderNamed: folder)
+                    move(to: folder)
                 } label: {
                     Label(folder, systemImage: "folder")
                 }
@@ -53,7 +55,7 @@ struct MoveMenu: View {
             Divider()
             ForEach(FileCategory.allCases) { category in
                 Button(category.suggestedFolderName) {
-                    controller.move(recordIDs: ids, toFolderNamed: category.suggestedFolderName)
+                    move(to: category.suggestedFolderName)
                 }
             }
             Divider()
@@ -69,13 +71,18 @@ struct MoveMenu: View {
         .alert("Move into a new folder", isPresented: $askingForName) {
             TextField("Folder name", text: $newFolderName)
             Button("Move") {
-                controller.move(recordIDs: ids, toFolderNamed: trimmedName)
+                move(to: trimmedName)
             }
             .disabled(!FileOrganizer.isValidFolderName(trimmedName))
             Button("Cancel", role: .cancel) {}
         } message: {
             Text("The folder is created directly inside the selected folder if it doesn't exist. Items keep their names, and nothing is overwritten.")
         }
+    }
+
+    private func move(to folder: String) {
+        controller.move(recordIDs: ids, toFolderNamed: folder)
+        onMove()
     }
 }
 
@@ -259,6 +266,8 @@ struct QuickMoveButtons: View {
     @ObservedObject var controller: ScanController
     let recordID: Int
     let highlighted: Bool
+    /// Called after a move is started, e.g. to select the next row.
+    var onMove: () -> Void = {}
 
     var body: some View {
         if controller.organizeModeEnabled, let record = controller.record(recordID) {
@@ -266,6 +275,7 @@ struct QuickMoveButtons: View {
                 ForEach(controller.quickFolders, id: \.self) { folder in
                     Button {
                         controller.move(recordIDs: [recordID], toFolderNamed: folder)
+                        onMove()
                     } label: {
                         if folder == FileOrganizer.trashFolderName {
                             Label(folder, systemImage: "trash")

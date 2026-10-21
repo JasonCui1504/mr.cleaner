@@ -138,5 +138,9 @@ final class SummaryFilterTests: XCTestCase {
 
         criteria.excludedRelativePaths = ["Tax"]
         XCTAssertEqual(criteria.apply(to: data, sortedBy: []).count, 5)
+
+        criteria = FilterCriteria()
+        criteria.collapsedFolders = ["Taxes"]
+        XCTAssertEqual(criteria.apply(to: data, sortedBy: []).map(\.id), [0, 3, 4])
     }
 }

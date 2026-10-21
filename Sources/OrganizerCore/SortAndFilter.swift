@@ -86,12 +86,14 @@ public struct FilterCriteria: Equatable, Sendable {
     /// Relative paths to leave out, together with everything inside them.
     /// Used to hide items already moved into a folder in Organize mode.
     public var excludedRelativePaths: Set<String> = []
+    /// Folders whose contents are left out; the folder row itself stays.
+    public var collapsedFolders: Set<String> = []
 
     public init() {}
 
     public func matches(_ row: FileRow) -> Bool {
         let record = row.record
-        if !excludedRelativePaths.isEmpty && isExcluded(record.relativePath) { return false }
+        if !(excludedRelativePaths.isEmpty && collapsedFolders.isEmpty) && isExcluded(record.relativePath) { return false }
         switch kind {
         case .all: break
         case .files: if record.kind == .directory { return false }
@@ -123,13 +125,18 @@ public struct FilterCriteria: Equatable, Sendable {
         return true
     }
 
-    /// True when `relativePath` or one of its parent folders is excluded.
+    /// True when `relativePath` or one of its parent folders is excluded, or
+    /// one of its parent folders is collapsed.
     private func isExcluded(_ relativePath: String) -> Bool {
         var path = Substring(relativePath)
+        var isSelf = true
         while !path.isEmpty {
-            if excludedRelativePaths.contains(String(path)) { return true }
+            let current = String(path)
+            if excludedRelativePaths.contains(current) { return true }
+            if !isSelf && collapsedFolders.contains(current) { return true }
             guard let slash = path.lastIndex(of: "/") else { break }
             path = path[..<slash]
+            isSelf = false
         }
         return false
     }

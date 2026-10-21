@@ -221,6 +221,14 @@ public final class ScanController: ObservableObject {
         [FileOrganizer.trashFolderName] + FileCategory.allCases.map(\.suggestedFolderName)
     }
 
+    /// Folders things get sorted into: the Trash folder, every folder in the
+    /// row buttons, and the suggested category folders. The Files tab can hide
+    /// their contents, so files sorted in earlier sessions stay out of the way
+    /// after a rescan.
+    public var organizedFolderNames: Set<String> {
+        Set(quickFolders + destinationFolderNames)
+    }
+
     /// Where items moved this session now live, relative to the selected
     /// folder. The Files tab hides these (and their contents) so a moved item
     /// no longer looks like it's still in its old place.

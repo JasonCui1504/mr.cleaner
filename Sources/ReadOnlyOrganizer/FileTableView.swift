@@ -10,7 +10,8 @@ struct FileTableView: View {
     @State private var displayed: [FileRow] = []
     /// Row under the mouse, to reveal its move buttons.
     @State private var hoveredRowID: Int?
-    /// In Organize mode, leave out items already moved into a folder this session.
+    /// In Organize mode, leave out items moved this session and anything
+    /// already inside the folders you sort into.
     @State private var hideMovedItems = true
 
     var body: some View {
@@ -19,14 +20,14 @@ struct FileTableView: View {
             if controller.organizeModeEnabled {
                 QuickFolderBar(controller: controller)
                 HStack(spacing: 10) {
-                    MoveMenu(controller: controller, ids: selectedIDs)
+                    MoveMenu(controller: controller, ids: selectedIDs) { selectNext(after: selectedIDs) }
                     Text(selection.isEmpty
                          ? "Hover a row and click a folder button to move it there, or select several rows (⌘-click / ⇧-click) and use this menu."
                          : "\(selection.count) selected. Items keep their names; nothing is overwritten.")
                         .font(.caption).foregroundStyle(.secondary)
                     Spacer()
-                    Toggle("Hide moved items (\(controller.moveLog.count))", isOn: $hideMovedItems)
-                        .help("Items you moved this session disappear from the list. Turn off to see them in their new folders.")
+                    Toggle("Hide sorted items", isOn: $hideMovedItems)
+                        .help("Hides items you moved this session and everything already inside Trash, your folder buttons and the suggested folders, including from earlier sessions. Turn off to see them.")
                 }
             }
             HSplitView {
@@ -47,7 +48,8 @@ struct FileTableView: View {
                     TableColumn("Move to") { row in
                         QuickMoveButtons(
                             controller: controller, recordID: row.id,
-                            highlighted: hoveredRowID == row.id || selection.contains(row.id))
+                            highlighted: hoveredRowID == row.id || selection.contains(row.id),
+                            onMove: { selectNext(after: [row.id]) })
                             .rowHover(row.id, $hoveredRowID)
                     }
                     .width(min: 60, ideal: 240)
@@ -116,6 +118,7 @@ struct FileTableView: View {
         .onChange(of: controller.rowsVersion) { _ in refresh() }
         .onChange(of: hideMovedItems) { _ in refresh() }
         .onChange(of: controller.organizeModeEnabled) { _ in refresh() }
+        .onChange(of: controller.quickFolders) { _ in refresh() }
         .onChange(of: controller.phase) { phase in
             // A rescan renumbers records, so an old selection would point at other files.
             if phase == .scanning { selection = [] }
@@ -131,11 +134,23 @@ struct FileTableView: View {
         var effective = criteria
         if controller.organizeModeEnabled && hideMovedItems {
             effective.excludedRelativePaths = controller.movedRelativePaths
+            effective.collapsedFolders = controller.organizedFolderNames
         }
         displayed = effective.apply(to: controller.rows, sortedBy: sortOrder)
         // Don't keep hidden (just moved) rows selected.
         let visible = Set(displayed.map(\.id))
         if !selection.isSubset(of: visible) { selection.formIntersection(visible) }
+    }
+
+    /// After moving rows, select the row below them so the next item is ready
+    /// for its folder button without another click.
+    private func selectNext(after movedIDs: [Int]) {
+        let moved = Set(movedIDs)
+        guard let last = displayed.lastIndex(where: { moved.contains($0.id) }) else { return }
+        let next = displayed[(last + 1)...].first { !moved.contains($0.id) }
+            ?? displayed[..<last].last { !moved.contains($0.id) }
+        hoveredRowID = nil
+        if let next { selection = [next.id] } else { selection = [] }
     }
 }
 
