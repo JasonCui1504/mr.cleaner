@@ -131,5 +131,12 @@ final class SummaryFilterTests: XCTestCase {
         criteria = FilterCriteria()
         criteria.modifiedFrom = now.addingTimeInterval(-7 * 86_400)
         XCTAssertEqual(Set(criteria.apply(to: data, sortedBy: []).map(\.id)), [1, 2, 4])
+
+        criteria = FilterCriteria()
+        criteria.excludedRelativePaths = ["Taxes", "mystery.xyz"]
+        XCTAssertEqual(criteria.apply(to: data, sortedBy: []).map(\.id), [3])
+
+        criteria.excludedRelativePaths = ["Tax"]
+        XCTAssertEqual(criteria.apply(to: data, sortedBy: []).count, 5)
     }
 }

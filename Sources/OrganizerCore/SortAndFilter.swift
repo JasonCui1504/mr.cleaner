@@ -83,11 +83,15 @@ public struct FilterCriteria: Equatable, Sendable {
     public var maxBytes: Int64?
     public var hidden: HiddenFilter = .all
     public var reviewOnly = false
+    /// Relative paths to leave out, together with everything inside them.
+    /// Used to hide items already moved into a folder in Organize mode.
+    public var excludedRelativePaths: Set<String> = []
 
     public init() {}
 
     public func matches(_ row: FileRow) -> Bool {
         let record = row.record
+        if !excludedRelativePaths.isEmpty && isExcluded(record.relativePath) { return false }
         switch kind {
         case .all: break
         case .files: if record.kind == .directory { return false }
@@ -117,6 +121,17 @@ public struct FilterCriteria: Equatable, Sendable {
             if record.relativePath.range(of: query, options: options) == nil { return false }
         }
         return true
+    }
+
+    /// True when `relativePath` or one of its parent folders is excluded.
+    private func isExcluded(_ relativePath: String) -> Bool {
+        var path = Substring(relativePath)
+        while !path.isEmpty {
+            if excludedRelativePaths.contains(String(path)) { return true }
+            guard let slash = path.lastIndex(of: "/") else { break }
+            path = path[..<slash]
+        }
+        return false
     }
 
     public func apply(to rows: [FileRow], sortedBy comparators: [KeyPathComparator<FileRow>]) -> [FileRow] {

@@ -60,7 +60,7 @@ Tests create synthetic files only under `Tests/Fixtures/Generated/` (git-ignored
 
 1. Flip the **Organize mode** switch in the toolbar and confirm.
 2. Move things in any of these ways:
-   - **Files tab, one click per file**: type a name in **Your folders** and click **Create Folder** (make as many as you like; `Trash` is always there). Each row's **Move to** column then has one button per folder: hover the row and click the folder you want.
+   - **Files tab, one click per file**: type a name in **Your folders** and click **Create Folder** (make as many as you like; `Trash` is always there). Each row's **Move to** column then has one button per folder: hover the row and click the folder you want. Moved items drop out of the list right away (**Hide moved items**, on by default); turn that off to see them in their new folders, or undo from the Changes tab.
    - **Files tab, several at once**: select rows (⌘-click / ⇧-click), then **Move N items to…** → one of your folders, a suggested category folder, or **New Folder…**.
    - **Groups tab**: on potential duplicates, **Move to "Trash" folder** next to each copy.
    - **Suggested Organization tab**: **Create Folders and Move Files…**, choose folders, confirm.

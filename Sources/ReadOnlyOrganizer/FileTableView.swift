@@ -10,6 +10,8 @@ struct FileTableView: View {
     @State private var displayed: [FileRow] = []
     /// Row under the mouse, to reveal its move buttons.
     @State private var hoveredRowID: Int?
+    /// In Organize mode, leave out items already moved into a folder this session.
+    @State private var hideMovedItems = true
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -23,6 +25,8 @@ struct FileTableView: View {
                          : "\(selection.count) selected. Items keep their names; nothing is overwritten.")
                         .font(.caption).foregroundStyle(.secondary)
                     Spacer()
+                    Toggle("Hide moved items (\(controller.moveLog.count))", isOn: $hideMovedItems)
+                        .help("Items you moved this session disappear from the list. Turn off to see them in their new folders.")
                 }
             }
             HSplitView {
@@ -110,6 +114,8 @@ struct FileTableView: View {
         .onChange(of: criteria) { _ in refresh() }
         .onChange(of: sortOrder) { _ in refresh() }
         .onChange(of: controller.rowsVersion) { _ in refresh() }
+        .onChange(of: hideMovedItems) { _ in refresh() }
+        .onChange(of: controller.organizeModeEnabled) { _ in refresh() }
         .onChange(of: controller.phase) { phase in
             // A rescan renumbers records, so an old selection would point at other files.
             if phase == .scanning { selection = [] }
@@ -122,7 +128,14 @@ struct FileTableView: View {
     }
 
     private func refresh() {
-        displayed = criteria.apply(to: controller.rows, sortedBy: sortOrder)
+        var effective = criteria
+        if controller.organizeModeEnabled && hideMovedItems {
+            effective.excludedRelativePaths = controller.movedRelativePaths
+        }
+        displayed = effective.apply(to: controller.rows, sortedBy: sortOrder)
+        // Don't keep hidden (just moved) rows selected.
+        let visible = Set(displayed.map(\.id))
+        if !selection.isSubset(of: visible) { selection.formIntersection(visible) }
     }
 }
 

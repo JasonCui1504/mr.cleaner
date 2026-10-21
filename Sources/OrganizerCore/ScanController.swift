@@ -221,6 +221,15 @@ public final class ScanController: ObservableObject {
         [FileOrganizer.trashFolderName] + FileCategory.allCases.map(\.suggestedFolderName)
     }
 
+    /// Where items moved this session now live, relative to the selected
+    /// folder. The Files tab hides these (and their contents) so a moved item
+    /// no longer looks like it's still in its old place.
+    public var movedRelativePaths: Set<String> {
+        guard let rootPath = rootURL?.path else { return [] }
+        return Set(moveLog.filter { $0.rootPath == rootPath && $0.toPath.hasPrefix(rootPath + "/") }
+            .map { String($0.toPath.dropFirst(rootPath.count + 1)) })
+    }
+
     /// Moves the given records (keeping their names) into `root/folderName`.
     public func move(recordIDs: [Int], toFolderNamed folderName: String) {
         let sources = recordIDs.compactMap { self.record($0) }.map { URL(fileURLWithPath: $0.path) }
