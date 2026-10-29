@@ -51,6 +51,10 @@ public final class ScanController: ObservableObject {
     /// Folders shown as one-click "move here" buttons on every row. Names only,
     /// kept in memory; the folders themselves live inside the selected folder.
     @Published public private(set) var quickFolders: [String] = [FileOrganizer.trashFolderName]
+    /// Folders that already exist directly inside the selected folder (as of
+    /// the last scan or refresh), e.g. ones made in an earlier session. They
+    /// can be added to `quickFolders` and are offered as move destinations.
+    @Published public private(set) var existingFolders: [String] = []
 
     @Published public var options = ScanOptions()
     @Published public var thresholds = SummaryThresholds() {
@@ -143,6 +147,7 @@ public final class ScanController: ObservableObject {
             final.otherEntries = records.count - final.files - final.folders
             final.issues = issues.count
             progress = final
+            existingFolders = Self.topLevelFolderNames(in: records)
             rebuildRows()
             recomputeSummary()
             rebuildPlan()
@@ -166,6 +171,7 @@ public final class ScanController: ObservableObject {
         groupsByRecord = [:]
         progress = ScanProgress()
         lastScanDuration = nil
+        existingFolders = []
     }
 
     // MARK: Session-only edits
@@ -222,13 +228,27 @@ public final class ScanController: ObservableObject {
     }
 
     /// Moves the given records (keeping their names) into `root/folderName`.
+    /// With several records, see `movableSources` for what is left out.
     public func move(recordIDs: [Int], toFolderNamed folderName: String) {
-        let sources = recordIDs.compactMap { self.record($0) }.map { URL(fileURLWithPath: $0.path) }
+        let sources = movableSources(recordIDs: recordIDs, toFolderNamed: folderName)
         runOrganize(description: "Move to “\(folderName)”") { organizer in
             sources.map { source in
                 OrganizeReport.Outcome(path: source.path, result: Result { try organizer.move(source, intoFolderNamed: folderName) })
             }
         }
+    }
+
+    /// The items a move of `recordIDs` actually needs to move: each record
+    /// once, without items inside another selected folder (they travel with
+    /// that folder), the destination folder itself, and items already in it.
+    public func movableSources(recordIDs: [Int], toFolderNamed folderName: String) -> [URL] {
+        var seen = Set<Int>()
+        let selected = recordIDs.filter { seen.insert($0).inserted }.compactMap { self.record($0) }
+        let selectedFolders = selected.filter { $0.kind == .directory }.map { $0.path + "/" }
+        return selected.filter { record in
+            record.relativePath != folderName && record.parentRelativePath != folderName
+                && !selectedFolders.contains { record.path.hasPrefix($0) }
+        }.map { URL(fileURLWithPath: $0.path) }
     }
 
     /// Plan items that "apply plan" would move for the given folders: not in
@@ -332,6 +352,31 @@ public final class ScanController: ObservableObject {
     /// Removes a folder from the row buttons only. The folder on disk is untouched.
     public func removeQuickFolder(_ name: String) {
         quickFolders.removeAll { $0 == name }
+    }
+
+    /// Adds or removes a folder that already exists in the selected folder
+    /// from the row buttons. Never touches the disk, so it works with
+    /// Organize mode off too.
+    public func setQuickFolder(_ name: String, included: Bool) {
+        if included {
+            guard FileOrganizer.isValidFolderName(name), !quickFolders.contains(name) else { return }
+            quickFolders.append(name)
+        } else if name != FileOrganizer.trashFolderName {
+            removeQuickFolder(name)
+        }
+    }
+
+    /// Adds every folder that already exists in the selected folder.
+    public func includeAllExistingFolders() {
+        existingFolders.forEach { setQuickFolder($0, included: true) }
+    }
+
+    /// Names of the real folders directly inside the root, in Finder order.
+    private static func topLevelFolderNames(in records: [FileRecord]) -> [String] {
+        let names = records.lazy
+            .filter { $0.kind == .directory && $0.parentRelativePath.isEmpty && FileOrganizer.isValidFolderName($0.name) }
+            .map(\.name)
+        return Set(names).sorted { $0.localizedStandardCompare($1) == .orderedAscending }
     }
 
     // MARK: Refresh after organizing

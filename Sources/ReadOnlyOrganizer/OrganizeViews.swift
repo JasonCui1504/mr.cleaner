@@ -26,7 +26,61 @@ struct OrganizeModeToggle: View {
     }
 }
 
-/// "Move to…" menu: Trash folder, suggested category folders, or a new folder.
+/// Move destinations in menu order: your folders (Trash first), other
+/// folders already inside the selected folder, then suggested category
+/// folders that aren't listed yet.
+struct MoveDestinations {
+    let yours: [String]
+    let existing: [String]
+    let suggested: [String]
+
+    @MainActor
+    init(controller: ScanController) {
+        yours = controller.quickFolders
+        existing = controller.existingFolders.filter { !controller.quickFolders.contains($0) }
+        let listed = Set(yours + existing)
+        suggested = FileCategory.allCases.map(\.suggestedFolderName).filter { !listed.contains($0) }
+    }
+}
+
+/// Menu items for every destination; shared by "Move to…" and the table's
+/// right-click menu.
+struct MoveDestinationItems: View {
+    let destinations: MoveDestinations
+    let move: (String) -> Void
+
+    var body: some View {
+        Section("Your folders") {
+            ForEach(destinations.yours, id: \.self) { folder in
+                Button {
+                    move(folder)
+                } label: {
+                    if folder == FileOrganizer.trashFolderName {
+                        Label("“\(folder)” folder (you empty it yourself)", systemImage: "trash")
+                    } else {
+                        Label(folder, systemImage: "folder")
+                    }
+                }
+            }
+        }
+        if !destinations.existing.isEmpty {
+            Section("Already in this folder") {
+                ForEach(destinations.existing, id: \.self) { folder in
+                    Button { move(folder) } label: { Label(folder, systemImage: "folder") }
+                }
+            }
+        }
+        if !destinations.suggested.isEmpty {
+            Section("Suggested folders") {
+                ForEach(destinations.suggested, id: \.self) { folder in
+                    Button(folder) { move(folder) }
+                }
+            }
+        }
+    }
+}
+
+/// "Move to…" menu for the selected rows: any destination, or a new folder.
 struct MoveMenu: View {
     @ObservedObject var controller: ScanController
     let ids: [Int]
@@ -38,23 +92,8 @@ struct MoveMenu: View {
 
     var body: some View {
         Menu {
-            Button {
-                controller.move(recordIDs: ids, toFolderNamed: FileOrganizer.trashFolderName)
-            } label: {
-                Label("“\(FileOrganizer.trashFolderName)” folder (you empty it yourself)", systemImage: "trash")
-            }
-            ForEach(controller.quickFolders.filter { $0 != FileOrganizer.trashFolderName }, id: \.self) { folder in
-                Button {
-                    controller.move(recordIDs: ids, toFolderNamed: folder)
-                } label: {
-                    Label(folder, systemImage: "folder")
-                }
-            }
-            Divider()
-            ForEach(FileCategory.allCases) { category in
-                Button(category.suggestedFolderName) {
-                    controller.move(recordIDs: ids, toFolderNamed: category.suggestedFolderName)
-                }
+            MoveDestinationItems(destinations: MoveDestinations(controller: controller)) { folder in
+                controller.move(recordIDs: ids, toFolderNamed: folder)
             }
             Divider()
             Button("New Folder…") {
@@ -203,7 +242,8 @@ struct ApplyPlanSheet: View {
     }
 }
 
-/// "Your folders" bar: create folders and choose which ones appear as
+/// "Your folders" bar: create folders, pick folders that already exist
+/// (e.g. made in an earlier session), and choose which ones appear as
 /// one-click buttons on every row.
 struct QuickFolderBar: View {
     @ObservedObject var controller: ScanController
@@ -237,6 +277,7 @@ struct QuickFolderBar: View {
                     }
                 }
             }
+            ExistingFolderMenu(controller: controller)
             TextField("New folder name", text: $newFolderName)
                 .textFieldStyle(.roundedBorder)
                 .frame(width: 180)
@@ -253,34 +294,58 @@ struct QuickFolderBar: View {
     }
 }
 
-/// One-click "move here" buttons for a row, one per folder in the bar.
-/// Faint until you hover the row (or select it), so the table stays readable.
-struct QuickMoveButtons: View {
+/// Checklist of the folders already inside the selected folder; checked ones
+/// become row buttons. Only changes the in-memory list, never the disk.
+struct ExistingFolderMenu: View {
     @ObservedObject var controller: ScanController
-    let recordID: Int
-    let highlighted: Bool
 
     var body: some View {
-        if controller.organizeModeEnabled, let record = controller.record(recordID) {
-            HStack(spacing: 4) {
-                ForEach(controller.quickFolders, id: \.self) { folder in
-                    Button {
-                        controller.move(recordIDs: [recordID], toFolderNamed: folder)
-                    } label: {
-                        if folder == FileOrganizer.trashFolderName {
-                            Label(folder, systemImage: "trash")
-                        } else {
-                            Text(folder)
-                        }
-                    }
-                    .buttonStyle(.bordered)
-                    .controlSize(.small)
-                    .disabled(controller.phase.isBusy || record.parentRelativePath == folder || record.relativePath == folder)
-                    .help("Move “\(record.name)” into “\(folder)”")
+        Menu {
+            if controller.existingFolders.isEmpty {
+                Text("No folders found. Scan the folder first.")
+            } else {
+                Button("Add All") { controller.includeAllExistingFolders() }
+                Divider()
+                ForEach(controller.existingFolders, id: \.self) { folder in
+                    Toggle(folder, isOn: Binding(
+                        get: { controller.quickFolders.contains(folder) },
+                        set: { controller.setQuickFolder(folder, included: $0) }))
+                    .disabled(folder == FileOrganizer.trashFolderName)
                 }
             }
-            .opacity(highlighted ? 1 : 0.18)
-            .allowsHitTesting(highlighted)
+        } label: {
+            Label("Existing Folders", systemImage: "folder.badge.questionmark")
+        }
+        .fixedSize()
+        .help("Choose folders that already exist here to use as move buttons")
+    }
+}
+
+/// One-click "move here" buttons for a row, one per folder in the bar.
+/// Takes plain values (no observed controller, no hover or selection state)
+/// so table cells don't change while rows are being selected.
+struct QuickMoveButtons: View {
+    let record: FileRecord
+    let folders: [String]
+    let enabled: Bool
+    let move: (String) -> Void
+
+    var body: some View {
+        HStack(spacing: 4) {
+            ForEach(folders, id: \.self) { folder in
+                Button {
+                    move(folder)
+                } label: {
+                    if folder == FileOrganizer.trashFolderName {
+                        Label(folder, systemImage: "trash")
+                    } else {
+                        Text(folder)
+                    }
+                }
+                .buttonStyle(.bordered)
+                .controlSize(.small)
+                .disabled(!enabled || record.parentRelativePath == folder || record.relativePath == folder)
+            }
         }
     }
 }

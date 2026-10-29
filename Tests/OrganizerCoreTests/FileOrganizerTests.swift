@@ -214,6 +214,53 @@ final class OrganizeModeControllerTests: XCTestCase {
         XCTAssertEqual(controller.record(childID)?.parentRelativePath, "Trash/old/sub")
     }
 
+    func testMovingSeveralItemsAtOnce() async throws {
+        let (controller, root) = try await scanned("multi", files: [
+            "a.txt", "b.jpg", "old/c.txt", "old/sub/d.txt", "Keep/already.txt",
+        ])
+        controller.organizeModeEnabled = true
+        let ids = controller.records.map(\.id)
+        // Everything selected: the folder's children travel with "old", the
+        // destination itself and items already in it are left out.
+        let sources = controller.movableSources(recordIDs: ids + ids, toFolderNamed: "Keep").map(\.lastPathComponent)
+        XCTAssertEqual(Set(sources), ["a.txt", "b.jpg", "old"])
+        XCTAssertEqual(sources.count, 3)
+
+        controller.move(recordIDs: ids, toFolderNamed: "Keep")
+        try await waitUntilIdle(controller)
+        XCTAssertEqual(controller.lastOrganizeReport?.movedCount, 3)
+        XCTAssertEqual(controller.lastOrganizeReport?.skipped.count, 0)
+        for path in ["Keep/a.txt", "Keep/b.jpg", "Keep/old/sub/d.txt", "Keep/already.txt"] {
+            XCTAssertNotNil(LStat(url: root.appendingPathComponent(path)), path)
+        }
+        XCTAssertEqual(controller.moveLog.count, 3)
+    }
+
+    func testExistingFoldersCanBeChosenAsButtons() async throws {
+        let (controller, root) = try await scanned("existing", files: [
+            "Receipts/r.pdf", "Photos 2024/p.jpg", "Photos 2024/inner/q.jpg", "loose.txt",
+        ])
+        XCTAssertEqual(controller.existingFolders, ["Photos 2024", "Receipts"], "top-level folders only")
+        XCTAssertEqual(controller.quickFolders, ["Trash"])
+
+        // Works with Organize mode off: it only changes the in-memory list.
+        controller.setQuickFolder("Receipts", included: true)
+        controller.setQuickFolder("Receipts", included: true)
+        XCTAssertEqual(controller.quickFolders, ["Trash", "Receipts"])
+        controller.includeAllExistingFolders()
+        XCTAssertEqual(controller.quickFolders, ["Trash", "Receipts", "Photos 2024"])
+        controller.setQuickFolder("Receipts", included: false)
+        controller.setQuickFolder("Trash", included: false)
+        XCTAssertEqual(controller.quickFolders, ["Trash", "Photos 2024"], "Trash always stays")
+        XCTAssertNotNil(LStat(url: root.appendingPathComponent("Receipts")))
+        XCTAssertNil(LStat(url: root.appendingPathComponent("Trash")), "nothing created")
+
+        controller.organizeModeEnabled = true
+        controller.addQuickFolder(named: "New One")
+        try await waitUntilIdle(controller)
+        XCTAssertEqual(controller.existingFolders, ["New One", "Photos 2024", "Receipts"], "refreshed after creating")
+    }
+
     func testInvalidQuickFolderNameIsRejected() async throws {
         let (controller, root) = try await scanned("badname", files: ["f.txt"])
         controller.organizeModeEnabled = true

@@ -23,6 +23,9 @@ struct FilePreviewView: NSViewRepresentable {
     }
 
     static func dismantleNSView(_ view: QLPreviewView, coordinator: ()) {
+        // Runs when the selection changes (e.g. to several rows). Drop the item
+        // first so a preview still loading is cancelled before the view closes.
+        view.previewItem = nil
         view.close()
     }
 }

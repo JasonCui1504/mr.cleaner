@@ -8,8 +8,6 @@ struct FileTableView: View {
     @State private var criteria = FilterCriteria()
     @State private var sortOrder: [KeyPathComparator<FileRow>] = [KeyPathComparator(\FileRow.relativePath)]
     @State private var displayed: [FileRow] = []
-    /// Row under the mouse, to reveal its move buttons.
-    @State private var hoveredRowID: Int?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -19,8 +17,8 @@ struct FileTableView: View {
                 HStack(spacing: 10) {
                     MoveMenu(controller: controller, ids: selectedIDs)
                     Text(selection.isEmpty
-                         ? "Hover a row and click a folder button to move it there, or select several rows (⌘-click / ⇧-click) and use this menu."
-                         : "\(selection.count) selected. Items keep their names; nothing is overwritten.")
+                         ? "Click a folder button on a row to move it there, or select several rows (⌘-click / ⇧-click) and use this menu or right-click."
+                         : "\(selection.count) selected. A folder button on a selected row, this menu, or right-click moves all of them. Items keep their names; nothing is overwritten.")
                         .font(.caption).foregroundStyle(.secondary)
                     Spacer()
                 }
@@ -37,14 +35,17 @@ struct FileTableView: View {
                                 .foregroundStyle(row.isFolder ? Color.accentColor : Color.secondary)
                         }
                         .help(row.relativePath)
-                        .rowHover(row.id, $hoveredRowID)
                     }
                     .width(min: 160, ideal: 260)
                     TableColumn("Move to") { row in
-                        QuickMoveButtons(
-                            controller: controller, recordID: row.id,
-                            highlighted: hoveredRowID == row.id || selection.contains(row.id))
-                            .rowHover(row.id, $hoveredRowID)
+                        if controller.organizeModeEnabled {
+                            QuickMoveButtons(
+                                record: row.record, folders: controller.quickFolders,
+                                enabled: !controller.phase.isBusy
+                            ) { folder in
+                                controller.move(recordIDs: idsToMove(clicked: row.id), toFolderNamed: folder)
+                            }
+                        }
                     }
                     .width(min: 60, ideal: 240)
                     TableColumn("Category", value: \.categoryName) { row in
@@ -54,7 +55,6 @@ struct FileTableView: View {
                                 Image(systemName: "flag.fill").foregroundStyle(.orange).help("Review candidate")
                             }
                         }
-                        .rowHover(row.id, $hoveredRowID)
                     }
                     .width(min: 120, ideal: 180)
                     TableColumn("Type", value: \.typeName)
@@ -72,14 +72,22 @@ struct FileTableView: View {
                         Text(row.modifiedText).monospacedDigit()
                     }
                     .width(min: 120, ideal: 170)
-                    TableColumn("Relative Path", value: \.relativePath) { row in
-                        Text(row.relativePath).rowHover(row.id, $hoveredRowID)
-                    }
-                    .width(min: 160, ideal: 300)
+                    TableColumn("Relative Path", value: \.relativePath)
+                        .width(min: 160, ideal: 300)
                     TableColumn("Confidence", value: \.confidenceRank) { row in
                         Text(row.confidenceText)
                     }
                     .width(min: 60, ideal: 80)
+                }
+                .contextMenu(forSelectionType: Int.self) { ids in
+                    if controller.organizeModeEnabled && !ids.isEmpty {
+                        Menu(ids.count == 1 ? "Move to" : "Move \(ids.count) Items to") {
+                            MoveDestinationItems(destinations: MoveDestinations(controller: controller)) { folder in
+                                controller.move(recordIDs: inTableOrder(ids), toFolderNamed: folder)
+                            }
+                        }
+                        .disabled(controller.phase.isBusy)
+                    }
                 }
                 .frame(minWidth: 600)
 
@@ -117,8 +125,16 @@ struct FileTableView: View {
     }
 
     /// Selected records, in table order.
-    private var selectedIDs: [Int] {
-        displayed.map(\.id).filter { selection.contains($0) }
+    private var selectedIDs: [Int] { inTableOrder(selection) }
+
+    private func inTableOrder(_ ids: Set<Int>) -> [Int] {
+        displayed.map(\.id).filter { ids.contains($0) }
+    }
+
+    /// A row's folder button moves the whole selection when that row is part
+    /// of it (as in Finder), otherwise just that row.
+    private func idsToMove(clicked id: Int) -> [Int] {
+        selection.contains(id) && selection.count > 1 ? selectedIDs : [id]
     }
 
     private func refresh() {
@@ -199,20 +215,5 @@ struct OptionalDatePicker: View {
                     .frame(width: 110)
             }
         }
-    }
-}
-
-private extension View {
-    /// Fills the cell and reports when the mouse is over this row.
-    func rowHover(_ id: Int, _ hovered: Binding<Int?>) -> some View {
-        frame(maxWidth: .infinity, alignment: .leading)
-            .contentShape(Rectangle())
-            .onHover { inside in
-                if inside {
-                    hovered.wrappedValue = id
-                } else if hovered.wrappedValue == id {
-                    hovered.wrappedValue = nil
-                }
-            }
     }
 }
