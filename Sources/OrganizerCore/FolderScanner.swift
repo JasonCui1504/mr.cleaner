@@ -206,6 +206,21 @@ public struct FolderScanner: Sendable {
             info: info, rootURL: rootURL, cancellation: CancellationFlag()).0
     }
 
+    /// Names of the real folders directly inside `root` (no packages, links or
+    /// hidden entries), in Finder order. Lists that one folder only, so it is
+    /// quick enough to run when a folder is chosen, before any scan.
+    public static func topLevelFolderNames(in root: URL) -> [String] {
+        let rootURL = root.standardizedFileURL
+        guard let entries = try? FileManager.default.contentsOfDirectory(
+            at: rootURL, includingPropertiesForKeys: [.isPackageKey], options: [.skipsHiddenFiles]) else { return [] }
+        return entries.filter { entry in
+            guard let info = LStat(url: entry), info.kind == .directory else { return false }
+            return (try? entry.resourceValues(forKeys: [.isPackageKey]).isPackage) != true
+        }
+        .map(\.lastPathComponent)
+        .sorted { $0.localizedStandardCompare($1) == .orderedAscending }
+    }
+
     // MARK: Record construction
 
     private func makeRecord(

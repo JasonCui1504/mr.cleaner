@@ -12,8 +12,10 @@ struct FileTableView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             FilterBar(criteria: $criteria, extensions: controller.availableExtensions)
-            if controller.organizeModeEnabled {
+            if controller.rootURL != nil {
                 QuickFolderBar(controller: controller)
+            }
+            if controller.organizeModeEnabled {
                 HStack(spacing: 10) {
                     MoveMenu(controller: controller, ids: selectedIDs)
                     Text(selection.isEmpty

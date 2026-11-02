@@ -204,7 +204,7 @@ struct EmptyStateView: View {
             Text("1. Click “Choose Folder…” and pick any folder you can open.")
             Text("2. Click “Scan Folder”. Only that folder and its subfolders are listed; symbolic links are not followed.")
             Text("3. Review the summary, the file table, suggested groups, and the suggested (virtual) organization.")
-            Text("Nothing is changed on disk and nothing is saved. Results disappear when you quit.")
+            Text("Nothing is changed on disk. Results disappear when you quit; only your folder list is remembered.")
                 .foregroundStyle(.secondary)
             if phase.isBusy {
                 ProgressView("Working…").padding(.top, 8)

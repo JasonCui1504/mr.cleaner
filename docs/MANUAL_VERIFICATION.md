@@ -78,6 +78,7 @@ Any of:
 ## 6. Verify no persistent app data
 
 - [ ] `defaults read ReadOnlyOrganizer 2>/dev/null` and `defaults read local.readonly.fileorganizer 2>/dev/null` show nothing, **except** keys the system open panel may store (e.g. `NSNavLastRootDirectory`, `NSNavPanelExpandedSizeForOpenMode`). Those are written by macOS's `NSOpenPanel`, not by app code (see SAFETY_REVIEW.md).
+- [ ] `defaults read local.readonly.fileorganizer.folders` shows only `yourFoldersByRoot`: selected-folder paths mapped to folder names. That is the app's only saved data.
 - [ ] No new files for the app in `~/Library/Application Support`, `~/Library/Caches`, `~/Library/Logs`, or `$TMPDIR` (compare `ls -lt` before and after).
 - [ ] `~/Library/Saved Application State` has no entry for the app.
 

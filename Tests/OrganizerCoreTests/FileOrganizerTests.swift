@@ -261,6 +261,39 @@ final class OrganizeModeControllerTests: XCTestCase {
         XCTAssertEqual(controller.existingFolders, ["New One", "Photos 2024", "Receipts"], "refreshed after creating")
     }
 
+    func testYourFoldersAreRememberedPerSelectedFolder() async throws {
+        let suite = "local.readonly.fileorganizer.tests.\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+
+        let root = try Fixture.makeRoot("remember")
+        roots.append(root)
+        try Fixture.file(root, "Receipts/r.pdf", bytes: 4)
+        let other = try Fixture.makeRoot("remember-other")
+        roots.append(other)
+
+        let first = ScanController(folderStore: FolderListStore(defaults: defaults))
+        first.select(root: root)
+        XCTAssertEqual(first.existingFolders, ["Receipts"], "listed without scanning")
+        first.setQuickFolder("Receipts", included: true)
+        first.organizeModeEnabled = true
+        first.addQuickFolder(named: "Keep")
+        try await waitUntilIdle(first)
+        XCTAssertEqual(first.quickFolders, ["Trash", "Receipts", "Keep"])
+
+        // A new launch: same list for the same folder, a separate one elsewhere.
+        let second = ScanController(folderStore: FolderListStore(defaults: defaults))
+        second.select(root: root)
+        XCTAssertEqual(second.quickFolders, ["Trash", "Receipts", "Keep"])
+        second.removeQuickFolder("Receipts")
+        second.select(root: other)
+        XCTAssertEqual(second.quickFolders, ["Trash"])
+
+        let third = ScanController(folderStore: FolderListStore(defaults: defaults))
+        third.select(root: root)
+        XCTAssertEqual(third.quickFolders, ["Trash", "Keep"], "removals are remembered too")
+    }
+
     func testInvalidQuickFolderNameIsRejected() async throws {
         let (controller, root) = try await scanned("badname", files: ["f.txt"])
         controller.organizeModeEnabled = true

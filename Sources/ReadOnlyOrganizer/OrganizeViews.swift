@@ -242,9 +242,9 @@ struct ApplyPlanSheet: View {
     }
 }
 
-/// "Your folders" bar: create folders, pick folders that already exist
-/// (e.g. made in an earlier session), and choose which ones appear as
-/// one-click buttons on every row.
+/// "Your folders" bar: add folders that already exist (e.g. made in an
+/// earlier session), create new ones, and remove buttons. The list is
+/// remembered for each selected folder. Row buttons appear in Organize mode.
 struct QuickFolderBar: View {
     @ObservedObject var controller: ScanController
     @State private var newFolderName = ""
@@ -254,6 +254,7 @@ struct QuickFolderBar: View {
     var body: some View {
         HStack(spacing: 8) {
             Text("Your folders:").font(.callout.weight(.medium))
+            ExistingFolderMenu(controller: controller)
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 6) {
                     ForEach(controller.quickFolders, id: \.self) { folder in
@@ -277,32 +278,38 @@ struct QuickFolderBar: View {
                     }
                 }
             }
-            ExistingFolderMenu(controller: controller)
-            TextField("New folder name", text: $newFolderName)
+            TextField(controller.organizeModeEnabled ? "New folder name" : "Organize mode creates folders",
+                      text: $newFolderName)
                 .textFieldStyle(.roundedBorder)
-                .frame(width: 180)
+                .frame(width: 200)
                 .onSubmit(create)
+                .disabled(!controller.organizeModeEnabled)
             Button("Create Folder", action: create)
-                .disabled(!FileOrganizer.isValidFolderName(trimmedName) || controller.phase.isBusy)
+                .disabled(!canCreate)
         }
     }
 
+    private var canCreate: Bool {
+        controller.organizeModeEnabled && FileOrganizer.isValidFolderName(trimmedName) && !controller.phase.isBusy
+    }
+
     private func create() {
-        guard FileOrganizer.isValidFolderName(trimmedName) else { return }
+        guard canCreate else { return }
         controller.addQuickFolder(named: trimmedName)
         newFolderName = ""
     }
 }
 
 /// Checklist of the folders already inside the selected folder; checked ones
-/// become row buttons. Only changes the in-memory list, never the disk.
+/// join "Your folders". Only changes the list, never the disk, so it works
+/// with Organize mode off too.
 struct ExistingFolderMenu: View {
     @ObservedObject var controller: ScanController
 
     var body: some View {
         Menu {
             if controller.existingFolders.isEmpty {
-                Text("No folders found. Scan the folder first.")
+                Text("There are no folders inside the selected folder yet.")
             } else {
                 Button("Add All") { controller.includeAllExistingFolders() }
                 Divider()
@@ -314,10 +321,10 @@ struct ExistingFolderMenu: View {
                 }
             }
         } label: {
-            Label("Existing Folders", systemImage: "folder.badge.questionmark")
+            Label("Add Existing Folder", systemImage: "plus.circle")
         }
         .fixedSize()
-        .help("Choose folders that already exist here to use as move buttons")
+        .help("Add folders that are already inside the selected folder to Your folders")
     }
 }
 

@@ -5,7 +5,8 @@ import XCTest
 /// inspection, that the app contains no delete/rename/copy/edit code paths, no
 /// process execution, networking, persistence, or AI/ML. The only changes it
 /// can make (Organize mode) are creating folders and moving items, and only in
-/// `FileOrganizer.swift`. Comment lines are ignored so that documentation can
+/// `FileOrganizer.swift`. The only thing it saves is the "Your folders" name
+/// list, and only in `FolderListStore.swift`. Comment lines are ignored so that documentation can
 /// name the APIs it forbids.
 final class SafetyTests: XCTestCase {
 
@@ -47,8 +48,9 @@ final class SafetyTests: XCTestCase {
         return result
     }
 
-    private func assertNoMatches(_ patterns: [String], _ reason: String, file: StaticString = #filePath, line: UInt = #line) throws {
-        let lines = try codeLines()
+    private func assertNoMatches(_ patterns: [String], _ reason: String, exceptIn allowedFiles: Set<String> = [],
+                                 file: StaticString = #filePath, line: UInt = #line) throws {
+        let lines = try codeLines().filter { !allowedFiles.contains($0.file) }
         for pattern in patterns {
             let regex = try NSRegularExpression(pattern: pattern)
             for sourceLine in lines {
@@ -125,7 +127,25 @@ final class SafetyTests: XCTestCase {
             #"bookmarkData"#, #"setFrameAutosaveName"#, #"frameAutosaveName"#, #"FileManager\.default\.temporaryDirectory"#,
             #"applicationSupportDirectory"#, #"cachesDirectory"#, #"documentDirectory"#, #"\bos_log\b"#, #"Logger\("#,
             #"NSLog\("#, #"\bprint\("#, #"FileLogger"#, #"noteNewRecentDocument"#,
-        ], "Persistence or logging in app sources")
+        ], "Persistence or logging in app sources", exceptIn: ["FolderListStore.swift"])
+    }
+
+    func testOnlyTheFolderListIsSaved() throws {
+        // Preferences are opened and written only by FolderListStore, which
+        // stores folder names and nothing else.
+        let regex = try NSRegularExpression(pattern: #"UserDefaults\(|\.set\(|\bforKey:"#)
+        var found = Set<String>()
+        for sourceLine in try codeLines() {
+            let text = sourceLine.text
+            if regex.firstMatch(in: text, range: NSRange(text.startIndex..., in: text)) != nil {
+                found.insert(sourceLine.file)
+            }
+        }
+        XCTAssertEqual(found, ["FolderListStore.swift"])
+        try assertNoMatches([
+            #"CoreData"#, #"SwiftData"#, #"sqlite3_"#, #"NSKeyedArchiver"#, #"bookmarkData"#, #"\.write\("#,
+            #"applicationSupportDirectory"#, #"cachesDirectory"#, #"documentDirectory"#,
+        ], "FolderListStore must only use preferences")
     }
 
     func testNoAIOrMLFrameworks() throws {

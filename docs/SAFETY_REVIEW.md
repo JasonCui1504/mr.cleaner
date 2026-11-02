@@ -11,7 +11,7 @@ This document lists every filesystem, system, and network-relevant API used by t
 | No file contents read by the app | No content-reading API (`Data(contentsOf:)`, `FileHandle`, `read(`, `mmap`, PDFKit, AVFoundation, hashing) appears in `Sources/` (`testNoFileContentReads`). The only content access is the Quick Look preview of the one file you select, confined to `FilePreview.swift` (`testQuickLookPreviewOnlyInFilePreview`). |
 | No code execution | No `Process`, `NSTask`, `system`, `posix_spawn`, AppleScript, or `NSWorkspace` (`testNoProcessExecutionOrOpening`). |
 | Offline | No networking API, framework, or URL literal (`testNoNetworking`). `Package.swift` declares no dependencies (`testPackageHasNoDependencies`). Only Apple system frameworks are imported. |
-| No persistence | No `UserDefaults` writes, `@AppStorage`, `@SceneStorage`, Core Data, SQLite, bookmarks, window frame autosave, temp/cache/support directories, or logging (`testNoPersistence`). |
+| No persistence (one exception) | No `UserDefaults` writes, `@AppStorage`, `@SceneStorage`, Core Data, SQLite, bookmarks, window frame autosave, temp/cache/support directories, or logging (`testNoPersistence`), except `FolderListStore.swift`, which saves only the **Your folders** names per selected folder path in the preferences domain `local.readonly.fileorganizer.folders` (`testOnlyTheFolderListIsSaved`). |
 | No AI/ML | No Core ML, Create ML, Natural Language, Vision, Speech, or model/LLM references (`testNoAIOrMLFrameworks`). |
 | No mutation-implying UI | No buttons or labels named Apply/Move/Rename/Delete/Organize now/Trash/Clean, and no "safe to delete" text (`testNoForbiddenActionLabelsInUI`). |
 

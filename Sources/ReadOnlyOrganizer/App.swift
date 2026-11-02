@@ -3,8 +3,8 @@ import SwiftUI
 import OrganizerCore
 
 /// Entry point. An AppKit lifecycle is used instead of a SwiftUI `App`
-/// scene so that no window frame autosave or state restoration is enabled:
-/// the app writes no preferences or saved state of its own.
+/// scene so that no window frame autosave or state restoration is enabled.
+/// The only thing the app saves is the "Your folders" list (`FolderListStore`).
 @main
 enum ReadOnlyOrganizerMain {
     @MainActor
@@ -30,7 +30,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var controller: ScanController?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
-        let controller = ScanController()
+        let controller = ScanController(folderStore: FolderListStore())
         self.controller = controller
 
         let window = NSWindow(

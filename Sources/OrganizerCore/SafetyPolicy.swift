@@ -17,8 +17,9 @@ import Foundation
 /// - No file contents are ever opened or read; nothing is hashed.
 /// - Symbolic links are never followed; packages and cloud placeholder
 ///   folders are not descended into.
-/// - Results live in memory only. Nothing is saved, cached, logged or
-///   exported. Category edits are session-only.
+/// - Results live in memory only. Nothing is cached, logged or exported, and
+///   category edits are session-only. The only saved data is the "Your
+///   folders" name list per selected folder, in `FolderListStore.swift`.
 /// - There is no networking code and no network-capable framework is imported.
 /// - Classification is a fixed, documented rule table (see `CategoryRules`).
 public enum SafetyPolicy {

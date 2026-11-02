@@ -8,7 +8,7 @@
 - **Empty source folders stay.** After moving files out, their old folders remain (possibly empty); remove them yourself if you like.
 - **Software projects are never split.** "Create Folders and Move Files…" skips files inside detected projects; move a whole project folder from the Files tab if you want.
 - **After a move, the list is updated in place** (no full rescan), so dates such as "Metadata changed" show the values from the last scan. Click **Scan Folder** for fresh metadata.
-- **Folder buttons are per session.** The **Your folders** list is in memory and starts with only `Trash` at each launch. The folders themselves stay on disk: after scanning, re-add them from **Existing Folders**.
+- **Your folders is remembered by path.** The list is saved per selected folder's path. If you rename or move that folder, its list starts over with `Trash`; re-add folders with **Add Existing Folder**. A remembered name whose folder was deleted is still shown; moving to it creates the folder again (Organize mode).
 - **Previews** use macOS Quick Look and show whatever Quick Look supports. Some formats only show an icon. iCloud-only files are not previewed.
 - **Same disk only.** Items on another volume mounted inside the selected folder are not moved.
 - **No saving.** Results, edits, and thresholds disappear on quit. There is no report export. (A future export would need its own explicit, separately approved design.)

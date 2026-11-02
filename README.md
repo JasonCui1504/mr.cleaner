@@ -6,7 +6,7 @@ A small native macOS app that **inspects** a folder you choose and **suggests** 
 - **Organize mode (off at every launch, confirmation required)** allows exactly two things, only inside the selected folder: **create a new folder** directly inside it, and **move an item into such a folder, keeping its name**. If the name is taken, the item is skipped, never overwritten or renamed. A folder named `Trash` is just a folder; you delete it yourself in Finder when you're ready. Every move can be undone during the session (Changes tab).
 - **Offline.** No network code, no remote assets, no update checks, no telemetry.
 - **No AI.** Categories come from a fixed, documented rule table (filename keywords, extension, entry kind). Every result shows the rule that produced it and its confidence.
-- **Nothing saved.** Scan results, category edits, and thresholds stay in memory and are discarded when you quit. No database, cache, log, settings file, or export.
+- **Almost nothing saved.** Scan results, category edits, thresholds and the move log stay in memory and are discarded when you quit. No database, cache, log, or export. The one exception is the **Your folders** list: the folder *names* you picked for each selected folder are remembered in a small preferences file (`defaults read local.readonly.fileorganizer.folders`; remove with `defaults delete local.readonly.fileorganizer.folders`).
 
 ## Requirements
 
@@ -43,7 +43,7 @@ The app opens on the **Dashboard** tab: file/folder/size totals, review candidat
 swift test
 ```
 
-Tests create synthetic files only under `Tests/Fixtures/Generated/` (git-ignored) and delete them afterwards. They never read your real folders. `SafetyTests` scans every file in `Sources/` and fails on any delete/rename/copy/write, content-reading, process, networking, persistence, or AI/ML API, and on folder creation or moving anywhere except `FileOrganizer.swift`.
+Tests create synthetic files only under `Tests/Fixtures/Generated/` (git-ignored) and delete them afterwards. They never read your real folders. `SafetyTests` scans every file in `Sources/` and fails on any delete/rename/copy/write, content-reading, process, networking, persistence, or AI/ML API, on folder creation or moving anywhere except `FileOrganizer.swift`, and on saving anything except the folder-name list in `FolderListStore.swift`.
 
 ## Using the app
 
@@ -60,7 +60,7 @@ Tests create synthetic files only under `Tests/Fixtures/Generated/` (git-ignored
 
 1. Flip the **Organize mode** switch in the toolbar and confirm.
 2. Move things in any of these ways:
-   - **Files tab, one click per file**: type a name in **Your folders** and click **Create Folder** (make as many as you like; `Trash` is always there). To reuse folders that already exist in the selected folder (for example ones you made in an earlier session), open **Existing Folders** and check the ones you want, or **Add All**. Each row's **Move to** column then has one button per folder.
+   - **Files tab, one click per file**: the **Your folders** bar (shown once a folder is chosen) holds your destinations; `Trash` is always there. Click **Add Existing Folder** to check folders that are already inside the selected folder (or **Add All**); this works before scanning and with Organize mode off. In Organize mode, type a name and click **Create Folder** to make a new one. The list is remembered for each selected folder, so next launch it's back as soon as you choose the same folder. Removing a folder from the bar never touches the disk. Each row's **Move to** column has one button per folder.
    - **Files tab, several at once**: select rows (⌘-click / ⇧-click), then click a folder button on any selected row, use **Move N items to…**, or right-click the selection. Destinations are your folders, any folder already in the selected folder, a suggested category folder, or **New Folder…** (menu only). Items inside a selected folder move with it.
    - **Groups tab**: on potential duplicates, **Move to "Trash" folder** next to each copy.
    - **Suggested Organization tab**: **Create Folders and Move Files…**, choose folders, confirm.

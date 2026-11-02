@@ -7,6 +7,8 @@ import Combine
 ///
 /// Everything here is in memory. Session edits (category overrides, "review
 /// later") are discarded when the app quits and are never written anywhere.
+/// The one exception is the list of "Your folders" names per selected folder,
+/// which is remembered through `FolderListStore` when one is given.
 ///
 /// Organize mode (off by default, every launch) is the only way to change the
 /// filesystem, and it is limited to what `FileOrganizer` allows: creating
@@ -48,12 +50,16 @@ public final class ScanController: ObservableObject {
     /// Moves made this session (newest last), for Undo. In memory only.
     @Published public private(set) var moveLog: [FileOrganizer.Move] = []
     @Published public private(set) var lastOrganizeReport: OrganizeReport?
-    /// Folders shown as one-click "move here" buttons on every row. Names only,
-    /// kept in memory; the folders themselves live inside the selected folder.
-    @Published public private(set) var quickFolders: [String] = [FileOrganizer.trashFolderName]
-    /// Folders that already exist directly inside the selected folder (as of
-    /// the last scan or refresh), e.g. ones made in an earlier session. They
-    /// can be added to `quickFolders` and are offered as move destinations.
+    /// Folders shown as one-click "move here" buttons on every row. Names only;
+    /// the folders themselves live inside the selected folder. Remembered per
+    /// selected folder when a `FolderListStore` was given, else in memory.
+    @Published public private(set) var quickFolders: [String] = [FileOrganizer.trashFolderName] {
+        didSet { saveQuickFolders() }
+    }
+    /// Folders that already exist directly inside the selected folder (listed
+    /// when it is chosen, updated by each scan or refresh), e.g. ones made in
+    /// an earlier session. They can be added to `quickFolders` and are
+    /// offered as move destinations.
     @Published public private(set) var existingFolders: [String] = []
 
     @Published public var options = ScanOptions()
@@ -67,15 +73,25 @@ public final class ScanController: ObservableObject {
     private var scanTask: Task<Void, Never>?
     private var resultsArePartial = false
     private var cancellation: CancellationFlag?
+    private let folderStore: FolderListStore?
 
-    public init() {}
+    /// - Parameter folderStore: where "Your folders" is remembered between
+    ///   launches; `nil` keeps it in memory only (used by tests).
+    public init(folderStore: FolderListStore? = nil) {
+        self.folderStore = folderStore
+    }
 
     // MARK: Folder selection
 
     public func select(root: URL) {
         guard !phase.isBusy else { return }
         clearResults()
-        rootURL = root.standardizedFileURL
+        let root = root.standardizedFileURL
+        rootURL = root
+        if let folderStore {
+            quickFolders = Self.withTrashFirst(folderStore.folders(forRoot: root.path))
+        }
+        existingFolders = FolderScanner.topLevelFolderNames(in: root).filter(FileOrganizer.isValidFolderName)
         phase = .ready
     }
 
@@ -171,7 +187,6 @@ public final class ScanController: ObservableObject {
         groupsByRecord = [:]
         progress = ScanProgress()
         lastScanDuration = nil
-        existingFolders = []
     }
 
     // MARK: Session-only edits
@@ -364,6 +379,20 @@ public final class ScanController: ObservableObject {
         } else if name != FileOrganizer.trashFolderName {
             removeQuickFolder(name)
         }
+    }
+
+    private func saveQuickFolders() {
+        guard let folderStore, let root = rootURL else { return }
+        folderStore.save(quickFolders.filter { $0 != FileOrganizer.trashFolderName }, forRoot: root.path)
+    }
+
+    /// `Trash` followed by the valid, distinct names in `names`.
+    private static func withTrashFirst(_ names: [String]) -> [String] {
+        var result = [FileOrganizer.trashFolderName]
+        for name in names where FileOrganizer.isValidFolderName(name) && !result.contains(name) {
+            result.append(name)
+        }
+        return result
     }
 
     /// Adds every folder that already exists in the selected folder.
