@@ -22,10 +22,8 @@ struct FilePreviewView: NSViewRepresentable {
         }
     }
 
-    static func dismantleNSView(_ view: QLPreviewView, coordinator: ()) {
-        // Runs when the selection changes (e.g. to several rows). Drop the item
-        // first so a preview still loading is cancelled before the view closes.
-        view.previewItem = nil
-        view.close()
-    }
+    // No dismantleNSView: with shouldCloseWithWindow, Quick Look deactivates the
+    // view itself when it leaves the window. Calling close() as well (e.g. when
+    // the selection changes to several rows and the pane is torn down)
+    // deactivates it twice, which Quick Look treats as a fatal assertion.
 }
